@@ -19,14 +19,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.scenicguide.ScenicGuideApplication
 import com.example.scenicguide.core.di.AppContainer
 import com.example.scenicguide.ui.chat.ChatScreen
 import com.example.scenicguide.ui.home.HomeScreen
 import com.example.scenicguide.ui.login.LoginScreen
+import com.example.scenicguide.ui.lostfound.LostFoundDetailScreen
+import com.example.scenicguide.ui.lostfound.LostFoundListScreen
+import com.example.scenicguide.ui.lostfound.LostFoundPublishScreen
 import com.example.scenicguide.ui.profile.ProfileScreen
 
 object Routes {
@@ -34,6 +39,11 @@ object Routes {
     const val HOME = "home"
     const val CHAT = "chat"
     const val PROFILE = "profile"
+    const val LOST_FOUND = "lost_found"
+    const val LOST_FOUND_DETAIL = "lost_found/{itemId}"
+    const val LOST_FOUND_PUBLISH = "lost_found_publish"
+
+    fun lostFoundDetail(itemId: Int) = "lost_found/$itemId"
 }
 
 @Composable
@@ -99,6 +109,32 @@ fun AppRoot() {
                     HomeScreen(
                         onOpenChat = { navController.navigate(Routes.CHAT) },
                         onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                        onOpenLostFound = { navController.navigate(Routes.LOST_FOUND) },
+                    )
+                }
+                composable(Routes.LOST_FOUND) {
+                    LostFoundListScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenDetail = { itemId ->
+                            navController.navigate(Routes.lostFoundDetail(itemId))
+                        },
+                        onPublish = { navController.navigate(Routes.LOST_FOUND_PUBLISH) },
+                    )
+                }
+                composable(
+                    route = Routes.LOST_FOUND_DETAIL,
+                    arguments = listOf(navArgument("itemId") { type = NavType.IntType }),
+                ) { entry ->
+                    val itemId = entry.arguments?.getInt("itemId") ?: 0
+                    LostFoundDetailScreen(
+                        itemId = itemId,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(Routes.LOST_FOUND_PUBLISH) {
+                    LostFoundPublishScreen(
+                        onBack = { navController.popBackStack() },
+                        onPublished = { navController.popBackStack() },
                     )
                 }
                 composable(Routes.CHAT) {

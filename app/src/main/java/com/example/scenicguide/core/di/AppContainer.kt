@@ -9,9 +9,11 @@ import com.example.scenicguide.core.session.UserPreferences
 import com.example.scenicguide.data.remote.AuthApi
 import com.example.scenicguide.data.remote.ChatApi
 import com.example.scenicguide.data.remote.HomeApi
+import com.example.scenicguide.data.remote.LostFoundApi
 import com.example.scenicguide.data.repository.AuthRepository
 import com.example.scenicguide.data.repository.ChatRepository
 import com.example.scenicguide.data.repository.HomeRepository
+import com.example.scenicguide.data.repository.LostFoundRepository
 import com.example.scenicguide.voice.TtsPlayer
 import com.example.scenicguide.voice.VoiceApi
 import com.example.scenicguide.voice.VoiceClient
@@ -36,6 +38,7 @@ class AppContainer(context: Context) {
     private val homeApi: HomeApi = retrofit.create(HomeApi::class.java)
     private val chatApi: ChatApi = retrofit.create(ChatApi::class.java)
     private val voiceApi: VoiceApi = retrofit.create(VoiceApi::class.java)
+    private val lostFoundApi: LostFoundApi = retrofit.create(LostFoundApi::class.java)
 
     private val sseClient = ChatSseClient(
         baseClient = okHttpClient,
@@ -46,6 +49,7 @@ class AppContainer(context: Context) {
     val authRepository = AuthRepository(authApi, sessionManager)
     val homeRepository = HomeRepository(homeApi)
     val chatRepository = ChatRepository(chatApi, sseClient)
+    val lostFoundRepository = LostFoundRepository(lostFoundApi)
 
     val voiceClient = VoiceClient(okHttpClient, BuildConfig.BASE_URL, voiceApi)
     val ttsPlayer = TtsPlayer(voiceClient, context.cacheDir)
