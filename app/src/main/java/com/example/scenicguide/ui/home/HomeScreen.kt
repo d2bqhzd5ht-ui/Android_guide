@@ -1,0 +1,382 @@
+package com.example.scenicguide.ui.home
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.scenicguide.data.model.Banner
+import com.example.scenicguide.data.model.HomeContent
+import com.example.scenicguide.data.model.PoiBrief
+import com.example.scenicguide.data.model.QuickEntry
+import com.example.scenicguide.data.model.RouteBrief
+import com.example.scenicguide.ui.components.ErrorView
+import com.example.scenicguide.ui.components.LoadingView
+import com.example.scenicguide.ui.rememberAppContainer
+
+private val bannerBrushes = listOf(
+    listOf(Color(0xFF0E7C66), Color(0xFF4BB39A)),
+    listOf(Color(0xFF1F5F8B), Color(0xFF5AA9D6)),
+    listOf(Color(0xFF8B5E1F), Color(0xFFD6A85A)),
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(
+    onOpenChat: () -> Unit,
+    onLoggedOut: () -> Unit,
+) {
+    val container = rememberAppContainer()
+    val viewModel: HomeViewModel = viewModel(
+        factory = HomeViewModel.factory(container.homeRepository, container.authRepository),
+    )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("景区导览", fontWeight = FontWeight.SemiBold) },
+                actions = {
+                    TextButton(onClick = { viewModel.logout(onLoggedOut) }) {
+                        Text("退出")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        when (val current = state) {
+            is HomeViewModel.UiState.Loading -> LoadingView(
+                text = "正在加载首页…",
+                modifier = Modifier.padding(padding),
+            )
+
+            is HomeViewModel.UiState.Error -> ErrorView(
+                message = current.message,
+                onRetry = viewModel::refresh,
+                modifier = Modifier.padding(padding),
+            )
+
+            is HomeViewModel.UiState.Success -> HomeContentView(
+                content = current.content,
+                onOpenChat = onOpenChat,
+                modifier = Modifier.padding(padding),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeContentView(
+    content: HomeContent,
+    onOpenChat: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item {
+            Text(
+                text = "发现身边的风景",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "AI 导览随时为你讲解",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        item { BannerPager(content.banners) }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenChat),
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "AI 智能问答",
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "边逛边问，流式回答随问随到",
+                            color = Color(0xFFCDEFE5),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Text(text = "去提问 ›", color = Color.White)
+                }
+            }
+        }
+
+        if (content.quickEntries.isNotEmpty()) {
+            item { SectionTitle("快捷入口") }
+            item { QuickEntryRow(content.quickEntries) }
+        }
+
+        if (content.hotPois.isNotEmpty()) {
+            item { SectionTitle("热门景点") }
+            item { HotPoiRow(content.hotPois) }
+        }
+
+        if (content.recommendedRoutes.isNotEmpty()) {
+            item { SectionTitle("推荐路线") }
+            items(content.recommendedRoutes) { route -> RouteCard(route) }
+        }
+
+        if (content.banners.isEmpty() && content.quickEntries.isEmpty() &&
+            content.hotPois.isEmpty() && content.recommendedRoutes.isEmpty()
+        ) {
+            item {
+                Text(
+                    text = "首页接口已通，但返回内容为空（字段结构待与后端对齐）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+@Composable
+private fun BannerPager(banners: List<Banner>) {
+    if (banners.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("暂无轮播内容", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+
+    val pagerState = rememberPagerState(pageCount = { banners.size })
+
+    Column {
+        HorizontalPager(
+            state = pagerState,
+            pageSpacing = 12.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp),
+        ) { page ->
+            val banner = banners[page]
+            val brush = bannerBrushes[page % bannerBrushes.size]
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Brush.linearGradient(brush)),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(18.dp),
+                ) {
+                    Text(
+                        text = banner.title.ifBlank { "景区推荐" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    banner.subtitle?.let {
+                        Text(
+                            text = it,
+                            color = Color(0xFFE6F5F0),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            banners.indices.forEach { index ->
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(if (index == pagerState.currentPage) 8.dp else 6.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (index == pagerState.currentPage) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                        ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickEntryRow(entries: List<QuickEntry>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        entries.take(4).forEachIndexed { index, entry ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.weight(1f),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(bannerBrushes[index % bannerBrushes.size].first().copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = entry.title.take(1),
+                        color = bannerBrushes[index % bannerBrushes.size].first(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Text(
+                    text = entry.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HotPoiRow(pois: List<PoiBrief>) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(pois) { poi ->
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .size(width = 170.dp, height = 110.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = poi.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    poi.category?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = poi.description ?: poi.location.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteCard(route: RouteBrief) {
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = route.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            route.description?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            val meta = listOfNotNull(route.duration, route.distance).joinToString(" · ")
+            if (meta.isNotBlank()) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+    }
+}
