@@ -56,15 +56,22 @@ fun ProfileScreen(
     val session by container.sessionManager.session.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    var refreshing by remember { mutableStateOf(true) }
     var profileError by remember { mutableStateOf<String?>(null) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var loggingOut by remember { mutableStateOf(false) }
 
-    // 进入页面时用 /auth/me 刷新资料；401 由全局拦截器统一回登录页
-    LaunchedEffect(Unit) {
-        val result = container.authRepository.refreshProfile()
-        if (result is ApiResult.Failure) profileError = result.error.message
+    fun refreshProfile() {
+        scope.launch {
+            refreshing = true
+            val result = container.authRepository.refreshProfile()
+            refreshing = false
+            profileError = (result as? ApiResult.Failure)?.error?.message
+        }
     }
+
+    // 进入页面时用 /auth/me 刷新资料；401 由全局拦截器统一回登录页
+    LaunchedEffect(Unit) { refreshProfile() }
 
     val user = session?.user
     val displayName = user?.nickname?.takeIf { it.isNotBlank() } ?: user?.username.orEmpty()
@@ -134,13 +141,35 @@ fun ProfileScreen(
                 }
             }
 
-            profileError?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
+            when {
+                refreshing -> Row(
                     modifier = Modifier.padding(top = 12.dp),
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        text = "正在刷新资料…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+
+                profileError != null -> Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "刷新失败，请重试",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { refreshProfile() }) { Text("重试") }
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -179,7 +208,7 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
             title = { Text("退出登录") },
-            text = { Text("退出后将返回登录页，本地保存的登录信息会被清除。") },
+            text = { Text("退出后将返回登录页，本地保存的登录信息会被清除") },
             confirmButton = {
                 TextButton(
                     enabled = !loggingOut,
