@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,37 +29,40 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.scenicguide.ui.rememberAppContainer
+import com.example.scenicguide.voice.TtsPlayerState
+import com.example.scenicguide.voice.VoiceInputButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(
-    onBack: () -> Unit,
-    /**
-     * 语音入口插槽（A 的 VoiceInputButton 从这里进来）：
-     * `voiceInput = { onText -> VoiceInputButton(voiceClient, enabled = !state.streaming, onRecognized = onText, onError = { ... }) }`
-     * 识别出的文字只会回填到输入框，不自动发送。传 null 时渲染占位按钮，位置先留出来。
-     */
-    voiceInput: (@Composable (onRecognized: (String) -> Unit) -> Unit)? = null,
-) {
+fun ChatScreen(onBack: () -> Unit) {
     val container = rememberAppContainer()
     val viewModel: ChatViewModel = viewModel(
         factory = ChatViewModel.factory(container.chatRepository),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val ttsState by container.ttsPlayer.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    var voiceError by remember { mutableStateOf<String?>(null) }
+    val speaking = ttsState is TtsPlayerState.Synthesizing ||
+        ttsState is TtsPlayerState.Playing
 
-    // 离开页面（返回/切屏被销毁）时中断流式请求
+    // 离开页面（返回/切屏被销毁）时中断流式请求和语音播报
     DisposableEffect(Unit) {
-        onDispose { viewModel.stop() }
+        onDispose {
+            viewModel.stop()
+            container.ttsPlayer.stop()
+        }
     }
 
     LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.content) {
@@ -76,7 +78,12 @@ fun ChatScreen(
                     Column {
                         Text("AI 问答", fontWeight = FontWeight.SemiBold)
                         Text(
-                            text = if (state.streaming) "正在流式回答…" else "景区知识随时问",
+                            text = when {
+                                speaking && ttsState is TtsPlayerState.Synthesizing -> "正在合成语音…"
+                                speaking -> "正在播报语音"
+                                state.streaming -> "正在流式回答…"
+                                else -> "景区知识随时问"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -95,7 +102,7 @@ fun ChatScreen(
                     .imePadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                state.error?.let { message ->
+                (voiceError ?: state.error)?.let { message ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -108,23 +115,32 @@ fun ChatScreen(
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = viewModel::dismissError) { Text("知道了") }
+                        TextButton(
+                            onClick = {
+                                voiceError = null
+                                viewModel.dismissError()
+                            },
+                        ) { Text("知道了") }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (voiceInput != null) {
-                        Box(modifier = Modifier.padding(end = 8.dp)) {
-                            voiceInput { text -> viewModel.appendInput(text) }
-                        }
-                    } else {
-                        VoiceSlotPlaceholder(modifier = Modifier.padding(end = 8.dp))
-                    }
                     OutlinedTextField(
                         value = state.input,
                         onValueChange = viewModel::onInputChange,
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("问问景区的事…") },
                         maxLines = 4,
+                        trailingIcon = {
+                            VoiceInputButton(
+                                voiceClient = container.voiceClient,
+                                enabled = !state.streaming,
+                                onRecognized = { text ->
+                                    voiceError = null
+                                    viewModel.send(text)
+                                },
+                                onError = { voiceError = it },
+                            )
+                        },
                     )
                     if (state.streaming) {
                         Button(
@@ -171,6 +187,7 @@ fun ChatScreen(
                     )
                 }
             } else {
+                val lastAssistantId = state.messages.lastOrNull { !it.fromUser }?.id
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -178,7 +195,15 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(state.messages) { message ->
-                        ChatBubble(message)
+                        ChatBubble(
+                            message = message,
+                            showSpeak = message.id == lastAssistantId &&
+                                !message.streaming &&
+                                message.content.isNotBlank(),
+                            speaking = speaking,
+                            onSpeak = { container.ttsPlayer.speak(message.content) },
+                            onStopSpeak = { container.ttsPlayer.stop() },
+                        )
                     }
                 }
             }
@@ -186,65 +211,64 @@ fun ChatScreen(
     }
 }
 
-/** 语音按钮占位：保持和 A 的 VoiceInputButton 一样的 48dp 圆形占位，合并后直接替换 */
 @Composable
-private fun VoiceSlotPlaceholder(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "语音",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun ChatBubble(message: ChatViewModel.Message) {
+private fun ChatBubble(
+    message: ChatViewModel.Message,
+    showSpeak: Boolean,
+    speaking: Boolean,
+    onSpeak: () -> Unit,
+    onStopSpeak: () -> Unit,
+) {
     val isUser = message.fromUser
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
     ) {
-        Surface(
-            shape = RoundedCornerShape(
-                topStart = 14.dp,
-                topEnd = 14.dp,
-                bottomStart = if (isUser) 14.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 14.dp,
-            ),
-            color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth(0.85f),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         ) {
-            Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                when {
-                    message.content.isEmpty() && message.streaming -> Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = "思考中…",
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 14.dp,
+                    topEnd = 14.dp,
+                    bottomStart = if (isUser) 14.dp else 4.dp,
+                    bottomEnd = if (isUser) 4.dp else 14.dp,
+                ),
+                color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth(0.85f),
+            ) {
+                Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    when {
+                        message.content.isEmpty() && message.streaming -> Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = "思考中…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+
+                        else -> Text(
+                            text = if (message.streaming) message.content + "▌" else message.content,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 8.dp),
+                            color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-
-                    else -> Text(
-                        text = if (message.streaming) message.content + "▌" else message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
+            }
+        }
+
+        if (showSpeak) {
+            TextButton(onClick = if (speaking) onStopSpeak else onSpeak) {
+                Text(if (speaking) "停止播报" else "朗读回答")
             }
         }
     }
