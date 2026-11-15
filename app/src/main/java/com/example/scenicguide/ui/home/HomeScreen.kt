@@ -55,6 +55,10 @@ private val bannerBrushes = listOf(
 
 private val hexPattern = Regex("#[0-9a-fA-F]{6}")
 
+/** 后端 quickEntries[].path 的目标路由（与后台配置保持一致） */
+private const val LOST_FOUND_PATH = "/lost-found"
+private const val CHAT_PATH = "/interaction"
+
 /** 后端 banners.color 是 CSS 串（如 linear-gradient(135deg, #1989fa, #4db8ff)），取其中的色值来画渐变 */
 private fun bannerBrush(css: String, fallback: List<Color>): Brush {
     val colors = hexPattern.findAll(css)
@@ -76,6 +80,7 @@ private fun hexColor(hex: String, fallback: Color): Color =
 fun HomeScreen(
     onOpenChat: () -> Unit,
     onOpenProfile: () -> Unit,
+    onOpenLostFound: () -> Unit,
 ) {
     val container = rememberAppContainer()
     val viewModel: HomeViewModel = viewModel(
@@ -110,6 +115,7 @@ fun HomeScreen(
             is HomeViewModel.UiState.Success -> HomeContentView(
                 content = current.content,
                 onOpenChat = onOpenChat,
+                onOpenLostFound = onOpenLostFound,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -120,6 +126,7 @@ fun HomeScreen(
 private fun HomeContentView(
     content: HomeContent,
     onOpenChat: () -> Unit,
+    onOpenLostFound: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -174,7 +181,18 @@ private fun HomeContentView(
 
         if (content.quickEntries.isNotEmpty()) {
             item { SectionTitle("快捷入口") }
-            item { QuickEntryRow(content.quickEntries) }
+            item {
+                QuickEntryRow(
+                    entries = content.quickEntries,
+                    onEntryClick = { entry ->
+                        when (entry.path) {
+                            LOST_FOUND_PATH -> onOpenLostFound()
+                            CHAT_PATH -> onOpenChat()
+                            else -> Unit
+                        }
+                    },
+                )
+            }
         }
 
         if (content.hotPois.isNotEmpty()) {
@@ -285,7 +303,7 @@ private fun BannerPager(banners: List<Banner>) {
 }
 
 @Composable
-private fun QuickEntryRow(entries: List<QuickEntry>) {
+private fun QuickEntryRow(entries: List<QuickEntry>, onEntryClick: (QuickEntry) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -294,7 +312,9 @@ private fun QuickEntryRow(entries: List<QuickEntry>) {
             val tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first())
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onEntryClick(entry) },
             ) {
                 Box(
                     modifier = Modifier
