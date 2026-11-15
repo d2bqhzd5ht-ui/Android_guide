@@ -1,95 +1,71 @@
 package com.example.scenicguide.data.model
 
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+/**
+ * 字段按后端源码定死（whoisthe4th/backend/src/routes/home.ts）：
+ * `GET /api/v1/home` → { code, message, data: { banners, quickEntries, hotPois, recommendedRoutes, hotProducts, stats } }
+ *
+ * - banners / quickEntries 来自 digital_human_config 键值对里的 JSON，字段名固定为
+ *   { id, title, image, color } 与 { icon, label, path, color }
+ * - hotPois 来自 poi 表：{ id, name, category, description }
+ * - recommendedRoutes 来自 route 表：{ id, name, theme, description, estimated_minutes }
+ * 保留默认值只为兜住「后台把配置改成缺字段」的情况，不再做 camelCase/snake_case 猜测。
+ */
+@Serializable
 data class Banner(
-    val id: String,
-    val title: String,
-    val subtitle: String?,
-    val imageUrl: String?,
+    val id: Int = 0,
+    val title: String = "",
+    /** 图片地址，后端默认给空串 */
+    val image: String = "",
+    /** CSS 渐变串，如 "linear-gradient(135deg, #1989fa, #4db8ff)" */
+    val color: String = "",
 )
 
+@Serializable
 data class QuickEntry(
-    val id: String,
-    val title: String,
-    val target: String?,
+    /** antd 图标名（如 service-o），Compose 侧暂无对应图标，保留字段备用 */
+    val icon: String = "",
+    val label: String = "",
+    /** 目标路由，如 /interaction、/poi */
+    val path: String = "",
+    /** 十六进制色值，如 #1989fa */
+    val color: String = "",
 )
 
+@Serializable
 data class PoiBrief(
-    val id: String,
-    val name: String,
-    val category: String?,
-    val location: String?,
-    val description: String?,
+    val id: Int = 0,
+    val name: String = "",
+    val category: String = "",
+    val description: String? = null,
 )
 
+@Serializable
 data class RouteBrief(
-    val id: String,
-    val name: String,
-    val description: String?,
-    val duration: String?,
-    val distance: String?,
+    val id: Int = 0,
+    val name: String = "",
+    /** 路线主题，如「人文古迹」 */
+    val theme: String = "",
+    val description: String? = null,
+    @SerialName("estimated_minutes")
+    val estimatedMinutes: Int = 0,
 )
 
+@Serializable
+data class HomeStats(
+    val totalInteractions: Int = 0,
+    val todayInteractions: Int = 0,
+    /** 0~1 之间的小数，后端四舍五入到两位 */
+    val positiveRate: Double = 0.0,
+)
+
+@Serializable
 data class HomeContent(
     val banners: List<Banner> = emptyList(),
     val quickEntries: List<QuickEntry> = emptyList(),
     val hotPois: List<PoiBrief> = emptyList(),
     val recommendedRoutes: List<RouteBrief> = emptyList(),
+    val stats: HomeStats = HomeStats(),
 )
-
-/**
- * `GET /api/v1/home` 在 openapi.yaml 里没有收录，只有交接文档给了 4 个字段名，
- * 所以这里做宽松解析：字段名兼容 camelCase / snake_case，缺字段时退化为空列表，不抛异常。
- * 拿到真实返回后按需收紧。
- */
-object HomeParser {
-
-    fun parse(root: JsonObject): HomeContent = HomeContent(
-        banners = objectsOf(root, "banners", "bannerList", "slides").map { item ->
-            Banner(
-                id = item.text("id").orEmpty(),
-                title = item.text("title", "name").orEmpty(),
-                subtitle = item.text("subtitle", "description", "desc"),
-                imageUrl = item.text("imageUrl", "image_url", "image", "cover", "url"),
-            )
-        },
-        quickEntries = objectsOf(root, "quickEntries", "quick_entries", "entries").map { item ->
-            QuickEntry(
-                id = item.text("id").orEmpty(),
-                title = item.text("title", "name").orEmpty(),
-                target = item.text("target", "route", "path", "link"),
-            )
-        },
-        hotPois = objectsOf(root, "hotPois", "hot_pois", "pois").map { item ->
-            PoiBrief(
-                id = item.text("id").orEmpty(),
-                name = item.text("name", "title").orEmpty(),
-                category = item.text("category"),
-                location = item.text("location", "address"),
-                description = item.text("description", "desc"),
-            )
-        },
-        recommendedRoutes = objectsOf(root, "recommendedRoutes", "recommended_routes", "routes").map { item ->
-            RouteBrief(
-                id = item.text("id").orEmpty(),
-                name = item.text("name", "title").orEmpty(),
-                description = item.text("description", "desc"),
-                duration = item.text("duration", "estimatedDuration", "estimated_duration"),
-                distance = item.text("distance", "totalDistance", "total_distance"),
-            )
-        },
-    )
-
-    private fun objectsOf(root: JsonObject, vararg keys: String): List<JsonObject> {
-        val array = keys.firstNotNullOfOrNull { root[it] as? JsonArray } ?: return emptyList()
-        return array.filterIsInstance<JsonObject>()
-    }
-
-    private fun JsonObject.text(vararg keys: String): String? =
-        keys.firstNotNullOfOrNull { key ->
-            (this[key] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
-        }
-}

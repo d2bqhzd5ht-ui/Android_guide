@@ -67,27 +67,30 @@ function currentUser(req) {
   return users.get(token.slice('mock-token-'.length)) || null
 }
 
+// 与 whoisthe4th/backend/src/routes/home.ts 的返回结构保持一致
 const homeData = {
   banners: [
-    { id: 1, title: '云栖竹径', subtitle: '竹影婆娑，一步一景', imageUrl: '' },
-    { id: 2, title: '九溪烟树', subtitle: '溪水潺潺，秋色正好', imageUrl: '' },
-    { id: 3, title: '灵隐古刹', subtitle: '千年古寺，钟声悠远', imageUrl: '' },
+    { id: 1, title: '欢迎来到西湖景区 AI 导览', image: '', color: 'linear-gradient(135deg, #1989fa, #4db8ff)' },
+    { id: 2, title: '智慧导览 · 沉浸式体验', image: '', color: 'linear-gradient(135deg, #07c160, #65d67c)' },
+    { id: 3, title: '语音交互 · 数字人陪伴', image: '', color: 'linear-gradient(135deg, #ff976a, #ffc77a)' },
   ],
   quickEntries: [
-    { id: 1, title: 'AI 问答', target: 'chat' },
-    { id: 2, title: '景点', target: 'poi' },
-    { id: 3, title: '路线', target: 'route' },
-    { id: 4, title: '失物招领', target: 'lostfound' },
+    { icon: 'service-o', label: 'AI 导览', path: '/interaction', color: '#1989fa' },
+    { icon: 'location-o', label: '景色推荐', path: '/poi', color: '#07c160' },
+    { icon: 'guide-o', label: '游玩攻略', path: '/routes', color: '#ff976a' },
+    { icon: 'goods-o', label: '失物招领', path: '/lost-found', color: '#7232dd' },
   ],
   hotPois: [
-    { id: 1, name: '灵隐寺', category: '人文古迹', location: '西湖区法云弄1号', description: '始建于东晋，江南著名古刹。' },
-    { id: 2, name: '九溪十八涧', category: '自然风光', location: '西湖区九溪路', description: '溪流蜿蜒，适合徒步。' },
-    { id: 3, name: '雷峰塔', category: '人文古迹', location: '南山路15号', description: '夕照雷峰，西湖十景之一。' },
+    { id: 1, name: '灵隐寺', category: '人文古迹', description: '始建于东晋，江南著名古刹。' },
+    { id: 2, name: '九溪十八涧', category: '自然风光', description: '溪流蜿蜒，适合徒步。' },
+    { id: 3, name: '雷峰塔', category: '人文古迹', description: '夕照雷峰，西湖十景之一。' },
   ],
   recommendedRoutes: [
-    { id: 1, name: '西湖经典一日游', description: '断桥 → 白堤 → 孤山 → 岳庙', duration: '约 6 小时', distance: '7.5km' },
-    { id: 2, name: '九溪徒步线', description: '九溪入口 → 溪中溪 → 茶园', duration: '约 3 小时', distance: '4.2km' },
+    { id: 1, name: '西湖经典一日游', theme: '人文古迹', description: '断桥 → 白堤 → 孤山 → 岳庙', estimated_minutes: 360 },
+    { id: 2, name: '九溪徒步线', theme: '自然风光', description: '九溪入口 → 溪中溪 → 茶园', estimated_minutes: 180 },
   ],
+  hotProducts: [],
+  stats: { totalInteractions: 0, todayInteractions: 0, positiveRate: 0 },
 }
 
 const streamingSessions = new Map() // sessionId -> { aborted }
@@ -192,8 +195,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (path === '/api/v1/home' && method === 'GET') {
-    // 真实后端的首页是需要登录的，这里同样校验 Bearer token
-    if (!currentUser(req)) return json(res, 401, { code: 40102, message: 'Token 无效或已过期' })
+    // 真实后端 home 路由没有 requireAuth（见 backend/src/routes/home.ts），这里同样不强制登录
     return ok(res, homeData)
   }
 
