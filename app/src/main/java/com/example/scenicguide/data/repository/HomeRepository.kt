@@ -3,16 +3,10 @@ package com.example.scenicguide.data.repository
 import com.example.scenicguide.core.network.ApiResult
 import com.example.scenicguide.core.network.apiCall
 import com.example.scenicguide.data.model.HomeContent
-import com.example.scenicguide.data.model.HomeParser
 import com.example.scenicguide.data.remote.HomeApi
 
 class HomeRepository(private val api: HomeApi) {
 
-    suspend fun loadHome(): ApiResult<HomeContent> {
-        val result = apiCall { api.home() }
-        return when (result) {
-            is ApiResult.Success -> ApiResult.Success(HomeParser.parse(result.data))
-            is ApiResult.Failure -> result
-        }
-    }
+    suspend fun loadHome(): ApiResult<HomeContent> =
+        apiCall { api.home() }
 }

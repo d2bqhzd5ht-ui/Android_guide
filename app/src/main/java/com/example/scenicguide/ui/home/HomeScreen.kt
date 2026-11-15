@@ -53,6 +53,24 @@ private val bannerBrushes = listOf(
     listOf(Color(0xFF8B5E1F), Color(0xFFD6A85A)),
 )
 
+private val hexPattern = Regex("#[0-9a-fA-F]{6}")
+
+/** 后端 banners.color 是 CSS 串（如 linear-gradient(135deg, #1989fa, #4db8ff)），取其中的色值来画渐变 */
+private fun bannerBrush(css: String, fallback: List<Color>): Brush {
+    val colors = hexPattern.findAll(css)
+        .map { Color(("FF" + it.value.drop(1)).toLong(16)) }
+        .toList()
+    return when {
+        colors.size >= 2 -> Brush.linearGradient(listOf(colors[0], colors[1]))
+        colors.size == 1 -> Brush.linearGradient(listOf(colors[0], colors[0].copy(alpha = 0.7f)))
+        else -> Brush.linearGradient(fallback)
+    }
+}
+
+/** 快捷入口的 color 是单个十六进制色值 */
+private fun hexColor(hex: String, fallback: Color): Color =
+    hexPattern.find(hex)?.let { Color(("FF" + it.value.drop(1)).toLong(16)) } ?: fallback
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -174,7 +192,7 @@ private fun HomeContentView(
         ) {
             item {
                 Text(
-                    text = "首页接口已通，但返回内容为空（字段结构待与后端对齐）",
+                    text = "后端返回的首页内容为空",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -219,13 +237,12 @@ private fun BannerPager(banners: List<Banner>) {
                 .height(150.dp),
         ) { page ->
             val banner = banners[page]
-            val brush = bannerBrushes[page % bannerBrushes.size]
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(150.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Brush.linearGradient(brush)),
+                    .background(bannerBrush(banner.color, bannerBrushes[page % bannerBrushes.size])),
             ) {
                 Column(
                     modifier = Modifier
@@ -238,13 +255,6 @@ private fun BannerPager(banners: List<Banner>) {
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
-                    banner.subtitle?.let {
-                        Text(
-                            text = it,
-                            color = Color(0xFFE6F5F0),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
                 }
             }
         }
@@ -281,6 +291,7 @@ private fun QuickEntryRow(entries: List<QuickEntry>) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         entries.take(4).forEachIndexed { index, entry ->
+            val tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first())
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.weight(1f),
@@ -289,18 +300,18 @@ private fun QuickEntryRow(entries: List<QuickEntry>) {
                     modifier = Modifier
                         .size(52.dp)
                         .clip(CircleShape)
-                        .background(bannerBrushes[index % bannerBrushes.size].first().copy(alpha = 0.15f)),
+                        .background(tint.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = entry.title.take(1),
-                        color = bannerBrushes[index % bannerBrushes.size].first(),
+                        text = entry.label.take(1).ifBlank { "·" },
+                        color = tint,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                 }
                 Text(
-                    text = entry.title,
+                    text = entry.label,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(top = 6.dp),
                 )
@@ -325,16 +336,16 @@ private fun HotPoiRow(pois: List<PoiBrief>) {
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    poi.category?.let {
+                    if (poi.category.isNotBlank()) {
                         Text(
-                            text = it,
+                            text = poi.category,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = poi.description ?: poi.location.orEmpty(),
+                        text = poi.description.orEmpty(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 3,
@@ -368,7 +379,10 @@ private fun RouteCard(route: RouteBrief) {
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            val meta = listOfNotNull(route.duration, route.distance).joinToString(" · ")
+            val meta = buildList {
+                if (route.theme.isNotBlank()) add(route.theme)
+                if (route.estimatedMinutes > 0) add("约 ${route.estimatedMinutes} 分钟")
+            }.joinToString(" · ")
             if (meta.isNotBlank()) {
                 Text(
                     text = meta,
