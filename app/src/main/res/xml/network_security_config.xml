@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 仅调试联调放行明文 HTTP；上线前改成 HTTPS 或收紧这里的域名 -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 模拟器 / adb reverse 都用本机回环 -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <!-- 真机联调：把电脑局域网 IP 加进来，例如
+        <domain includeSubdomains="true">192.168.1.10</domain>
+        -->
+    </domain-config>
+</network-security-config>
