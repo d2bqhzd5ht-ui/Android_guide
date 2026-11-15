@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,7 +42,15 @@ import com.example.scenicguide.ui.rememberAppContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(onBack: () -> Unit) {
+fun ChatScreen(
+    onBack: () -> Unit,
+    /**
+     * 语音入口插槽（A 的 VoiceInputButton 从这里进来）：
+     * `voiceInput = { onText -> VoiceInputButton(voiceClient, enabled = !state.streaming, onRecognized = onText, onError = { ... }) }`
+     * 识别出的文字只会回填到输入框，不自动发送。传 null 时渲染占位按钮，位置先留出来。
+     */
+    voiceInput: (@Composable (onRecognized: (String) -> Unit) -> Unit)? = null,
+) {
     val container = rememberAppContainer()
     val viewModel: ChatViewModel = viewModel(
         factory = ChatViewModel.factory(container.chatRepository),
@@ -102,6 +112,13 @@ fun ChatScreen(onBack: () -> Unit) {
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (voiceInput != null) {
+                        Box(modifier = Modifier.padding(end = 8.dp)) {
+                            voiceInput { text -> viewModel.appendInput(text) }
+                        }
+                    } else {
+                        VoiceSlotPlaceholder(modifier = Modifier.padding(end = 8.dp))
+                    }
                     OutlinedTextField(
                         value = state.input,
                         onValueChange = viewModel::onInputChange,
@@ -166,6 +183,24 @@ fun ChatScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** 语音按钮占位：保持和 A 的 VoiceInputButton 一样的 48dp 圆形占位，合并后直接替换 */
+@Composable
+private fun VoiceSlotPlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "语音",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

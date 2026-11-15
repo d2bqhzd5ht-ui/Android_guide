@@ -1,5 +1,6 @@
 package com.example.scenicguide.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +9,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +34,7 @@ object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val CHAT = "chat"
+    const val PROFILE = "profile"
 }
 
 @Composable
@@ -96,6 +99,7 @@ fun AppRoot() {
                 composable(Routes.HOME) {
                     HomeScreen(
                         onOpenChat = { navController.navigate(Routes.CHAT) },
+                        onOpenProfile = { navController.navigate(Routes.PROFILE) },
                         onLoggedOut = {
                             navController.navigate(Routes.LOGIN) {
                                 popUpTo(navController.graph.id) { inclusive = true }
@@ -106,7 +110,36 @@ fun AppRoot() {
                 composable(Routes.CHAT) {
                     ChatScreen(onBack = { navController.popBackStack() })
                 }
+                // 个人中心页面是 A 的，这里只提供可导航的占位；A 的 ProfileScreen 落地后替换本段
+                composable(Routes.PROFILE) {
+                    ProfileRoutePlaceholder(onBack = { navController.popBackStack() })
+                }
             }
+        }
+    }
+}
+
+/**
+ * 只负责让 Routes.PROFILE 可导航，不实现个人中心内容。
+ * A 的 ProfileScreen 合并后，把上面 composable(Routes.PROFILE) 里的调用换掉即可。
+ */
+@Composable
+private fun ProfileRoutePlaceholder(onBack: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(text = "个人中心", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = "路由已就位，页面由 A 实现",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        TextButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
+            Text("返回首页")
         }
     }
 }

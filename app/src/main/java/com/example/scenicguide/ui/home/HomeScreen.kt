@@ -76,6 +76,7 @@ private fun hexColor(hex: String, fallback: Color): Color =
 fun HomeScreen(
     onOpenChat: () -> Unit,
     onLoggedOut: () -> Unit,
+    onOpenProfile: () -> Unit,
 ) {
     val container = rememberAppContainer()
     val viewModel: HomeViewModel = viewModel(
@@ -110,6 +111,7 @@ fun HomeScreen(
             is HomeViewModel.UiState.Success -> HomeContentView(
                 content = current.content,
                 onOpenChat = onOpenChat,
+                onOpenProfile = onOpenProfile,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -120,6 +122,7 @@ fun HomeScreen(
 private fun HomeContentView(
     content: HomeContent,
     onOpenChat: () -> Unit,
+    onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -172,10 +175,9 @@ private fun HomeContentView(
             }
         }
 
-        if (content.quickEntries.isNotEmpty()) {
-            item { SectionTitle("快捷入口") }
-            item { QuickEntryRow(content.quickEntries) }
-        }
+        // 快捷入口 = 后端下发的入口 + 本地「个人中心」（个人中心页面归 A，这里只放入口）
+        item { SectionTitle("快捷入口") }
+        item { QuickEntryRow(content.quickEntries, onOpenProfile) }
 
         if (content.hotPois.isNotEmpty()) {
             item { SectionTitle("热门景点") }
@@ -285,38 +287,57 @@ private fun BannerPager(banners: List<Banner>) {
 }
 
 @Composable
-private fun QuickEntryRow(entries: List<QuickEntry>) {
+private fun QuickEntryRow(entries: List<QuickEntry>, onOpenProfile: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         entries.take(4).forEachIndexed { index, entry ->
-            val tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first())
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
+            QuickEntryItem(
+                label = entry.label,
+                tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first()),
                 modifier = Modifier.weight(1f),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(tint.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = entry.label.take(1).ifBlank { "·" },
-                        color = tint,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                Text(
-                    text = entry.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
+            )
         }
+        QuickEntryItem(
+            label = "个人中心",
+            tint = MaterialTheme.colorScheme.primary,
+            onClick = onOpenProfile,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun QuickEntryItem(
+    label: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label.take(1).ifBlank { "·" },
+                color = tint,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 
