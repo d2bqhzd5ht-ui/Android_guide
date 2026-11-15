@@ -57,7 +57,7 @@ private val bannerBrushes = listOf(
 @Composable
 fun HomeScreen(
     onOpenChat: () -> Unit,
-    onLoggedOut: () -> Unit,
+    onOpenProfile: () -> Unit,
 ) {
     val container = rememberAppContainer()
     val viewModel: HomeViewModel = viewModel(
@@ -70,8 +70,8 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("景区导览", fontWeight = FontWeight.SemiBold) },
                 actions = {
-                    TextButton(onClick = { viewModel.logout(onLoggedOut) }) {
-                        Text("退出")
+                    TextButton(onClick = onOpenProfile) {
+                        Text("我的")
                     }
                 },
             )

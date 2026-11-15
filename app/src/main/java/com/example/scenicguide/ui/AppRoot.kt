@@ -27,11 +27,13 @@ import com.example.scenicguide.core.di.AppContainer
 import com.example.scenicguide.ui.chat.ChatScreen
 import com.example.scenicguide.ui.home.HomeScreen
 import com.example.scenicguide.ui.login.LoginScreen
+import com.example.scenicguide.ui.profile.ProfileScreen
 
 object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val CHAT = "chat"
+    const val PROFILE = "profile"
 }
 
 @Composable
@@ -96,15 +98,21 @@ fun AppRoot() {
                 composable(Routes.HOME) {
                     HomeScreen(
                         onOpenChat = { navController.navigate(Routes.CHAT) },
+                        onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                    )
+                }
+                composable(Routes.CHAT) {
+                    ChatScreen(onBack = { navController.popBackStack() })
+                }
+                composable(Routes.PROFILE) {
+                    ProfileScreen(
+                        onBack = { navController.popBackStack() },
                         onLoggedOut = {
                             navController.navigate(Routes.LOGIN) {
                                 popUpTo(navController.graph.id) { inclusive = true }
                             }
                         },
                     )
-                }
-                composable(Routes.CHAT) {
-                    ChatScreen(onBack = { navController.popBackStack() })
                 }
             }
         }
