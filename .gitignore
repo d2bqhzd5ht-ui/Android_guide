@@ -1,0 +1,53 @@
+# ===== 构建产物 =====
+*.apk
+*.aar
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+build/
+.gradle/
+
+# ===== 本地配置 =====
+local.properties
+*.iml
+.idea/
+.navigation/
+captures/
+.externalNativeBuild
+.cxx
+
+# ===== 日志与缓存 =====
+*.log
+*.hprof
+.cxx/
+.externalNativeBuild/
+
+# ===== 签名文件（不要提交）=====
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# ===== 环境变量与密钥 =====
+.env
+.env.*
+!.env.example
+
+# ===== Google 服务配置 =====
+google-services.json
+
+# ===== Fastlane =====
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini
