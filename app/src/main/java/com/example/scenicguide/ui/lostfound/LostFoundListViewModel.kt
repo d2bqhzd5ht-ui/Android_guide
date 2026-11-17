@@ -69,11 +69,12 @@ class LostFoundListViewModel(
             val query = _query.value
             when (val result = repository.list(type = query.type, status = query.status, page = page, size = PAGE_SIZE)) {
                 is ApiResult.Success -> {
-                    val fresh = result.data.entries
+                    val pageData = result.data
+                    val fresh = pageData.list
                     val previous = if (reset) emptyList() else (_state.value as? UiState.Success)?.items.orEmpty()
                     _state.value = UiState.Success(
                         items = (previous + fresh).distinctBy { it.id },
-                        hasMore = fresh.size >= PAGE_SIZE,
+                        hasMore = pageData.pagination.page < pageData.pagination.totalPages,
                     )
                     page += 1
                 }

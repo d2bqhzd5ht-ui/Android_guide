@@ -314,7 +314,11 @@ const server = http.createServer(async (req, res) => {
     })
 
     const start = (page - 1) * size
-    return ok(res, { list: rows.slice(start, start + size), total: rows.length, page, size })
+    const total = rows.length
+    return ok(res, {
+      list: rows.slice(start, start + size),
+      pagination: { page, size, total, totalPages: Math.ceil(total / size) },
+    })
   }
 
   if (path === '/api/v1/lost-found' && method === 'POST') {
@@ -328,7 +332,7 @@ const server = http.createServer(async (req, res) => {
     const item = addLostFoundType({
       type: body.type,
       title: body.title,
-      category: body.category || null,
+      category: body.category || 'other',
       description: body.description || null,
       location: body.location || null,
       image_url: body.image_url || null,
@@ -357,7 +361,8 @@ const server = http.createServer(async (req, res) => {
     if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
     item.status = body.status
     item.updated_at = new Date().toISOString()
-    return ok(res, item)
+    // 真实后端 PATCH /status 只返回 { id, status }
+    return ok(res, { id: item.id, status: item.status })
   }
 
   // poi 表 category 是英文枚举；首页 hotPois 用中文展示，出接口时映射成后端真实值

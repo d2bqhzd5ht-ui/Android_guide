@@ -5,6 +5,7 @@ import com.example.scenicguide.data.model.LostFoundDraft
 import com.example.scenicguide.data.model.LostFoundItem
 import com.example.scenicguide.data.model.LostFoundPage
 import com.example.scenicguide.data.model.LostFoundStatusRequest
+import com.example.scenicguide.data.model.LostFoundStatusResult
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.HTTP
@@ -34,10 +35,10 @@ interface LostFoundApi {
     @POST("api/v1/lost-found")
     suspend fun create(@Body draft: LostFoundDraft): ApiEnvelope<LostFoundItem>
 
-    /** 改状态只能走 PATCH；Retrofit 没有 @PATCH 注解，用 @HTTP 声明 */
+    /** 改状态只能走 PATCH；Retrofit 没有 @PATCH 注解，用 @HTTP 声明。响应只有 { id, status } */
     @HTTP(method = "PATCH", path = "api/v1/lost-found/{id}/status", hasBody = true)
     suspend fun updateStatus(
         @Path("id") id: Int,
         @Body body: LostFoundStatusRequest,
-    ): ApiEnvelope<LostFoundItem>
+    ): ApiEnvelope<LostFoundStatusResult>
 }
