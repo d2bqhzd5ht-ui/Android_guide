@@ -32,6 +32,8 @@ import com.example.scenicguide.ui.login.LoginScreen
 import com.example.scenicguide.ui.lostfound.LostFoundDetailScreen
 import com.example.scenicguide.ui.lostfound.LostFoundListScreen
 import com.example.scenicguide.ui.lostfound.LostFoundPublishScreen
+import com.example.scenicguide.ui.poi.PoiDetailScreen
+import com.example.scenicguide.ui.poi.PoiListScreen
 import com.example.scenicguide.ui.profile.ProfileScreen
 
 object Routes {
@@ -42,8 +44,11 @@ object Routes {
     const val LOST_FOUND = "lost_found"
     const val LOST_FOUND_DETAIL = "lost_found/{itemId}"
     const val LOST_FOUND_PUBLISH = "lost_found_publish"
+    const val POI_LIST = "poi_list"
+    const val POI_DETAIL = "poi/{poiId}"
 
     fun lostFoundDetail(itemId: Int) = "lost_found/$itemId"
+    fun poiDetail(poiId: Int) = "poi/$poiId"
 }
 
 @Composable
@@ -110,6 +115,7 @@ fun AppRoot() {
                         onOpenChat = { navController.navigate(Routes.CHAT) },
                         onOpenProfile = { navController.navigate(Routes.PROFILE) },
                         onOpenLostFound = { navController.navigate(Routes.LOST_FOUND) },
+                        onOpenPoiList = { navController.navigate(Routes.POI_LIST) },
                     )
                 }
                 composable(Routes.LOST_FOUND) {
@@ -148,6 +154,24 @@ fun AppRoot() {
                                 popUpTo(navController.graph.id) { inclusive = true }
                             }
                         },
+                    )
+                }
+                composable(Routes.POI_LIST) {
+                    PoiListScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenDetail = { poiId ->
+                            navController.navigate(Routes.poiDetail(poiId))
+                        },
+                    )
+                }
+                composable(
+                    route = Routes.POI_DETAIL,
+                    arguments = listOf(navArgument("poiId") { type = NavType.IntType }),
+                ) { entry ->
+                    val poiId = entry.arguments?.getInt("poiId") ?: 0
+                    PoiDetailScreen(
+                        poiId = poiId,
+                        onBack = { navController.popBackStack() },
                     )
                 }
             }
