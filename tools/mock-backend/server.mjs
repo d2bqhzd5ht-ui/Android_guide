@@ -316,6 +316,30 @@ const server = http.createServer(async (req, res) => {
     if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
     return ok(res, item)
   }
+  if (lostFoundDetailMatch && method === 'PUT') {
+    const body = await readBody(req)
+    const item = lostFound.find((row) => row.id === Number(lostFoundDetailMatch[1]))
+    if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
+    if (body.type !== undefined && !['lost', 'found'].includes(body.type)) {
+      return fail(res, 400, 40001, 'type 只能是 lost 或 found')
+    }
+    // 真实后端：允许只传部分字段，但至少要有一个合法字段
+    const allowed = ['type', 'title', 'category', 'description', 'location', 'contact', 'publisher_name']
+    const patch = {}
+    for (const key of allowed) if (body[key] !== undefined) patch[key] = body[key]
+    if (Object.keys(patch).length === 0) {
+      return fail(res, 400, 40001, '至少需要一个可更新字段')
+    }
+    Object.assign(item, patch, { updated_at: new Date().toISOString() })
+    return ok(res, item)
+  }
+  if (lostFoundDetailMatch && method === 'DELETE') {
+    const id = Number(lostFoundDetailMatch[1])
+    const idx = lostFound.findIndex((row) => row.id === id)
+    if (idx === -1) return fail(res, 404, 40401, '失物招领记录不存在')
+    lostFound.splice(idx, 1)
+    return ok(res, { id })
+  }
 
   const lostFoundStatusMatch = path.match(/^\/api\/v1\/lost-found\/(\d+)\/status$/)
   if (lostFoundStatusMatch && method === 'PATCH') {

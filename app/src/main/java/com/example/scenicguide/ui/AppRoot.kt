@@ -30,6 +30,7 @@ import com.example.scenicguide.ui.chat.ChatScreen
 import com.example.scenicguide.ui.home.HomeScreen
 import com.example.scenicguide.ui.login.LoginScreen
 import com.example.scenicguide.ui.lostfound.LostFoundDetailScreen
+import com.example.scenicguide.ui.lostfound.LostFoundEditScreen
 import com.example.scenicguide.ui.lostfound.LostFoundListScreen
 import com.example.scenicguide.ui.lostfound.LostFoundPublishScreen
 import com.example.scenicguide.ui.poi.PoiDetailScreen
@@ -46,8 +47,10 @@ object Routes {
     const val LOST_FOUND_PUBLISH = "lost_found_publish"
     const val POI_LIST = "poi_list"
     const val POI_DETAIL = "poi/{poiId}"
+    const val LOST_FOUND_EDIT = "lost_found/{itemId}/edit"
 
     fun lostFoundDetail(itemId: Int) = "lost_found/$itemId"
+    fun lostFoundEdit(itemId: Int) = "lost_found/$itemId/edit"
     fun poiDetail(poiId: Int) = "poi/$poiId"
 }
 
@@ -135,6 +138,19 @@ fun AppRoot() {
                     LostFoundDetailScreen(
                         itemId = itemId,
                         onBack = { navController.popBackStack() },
+                        onEdit = { id -> navController.navigate(Routes.lostFoundEdit(id)) },
+                        onDeleted = { navController.popBackStack() },
+                    )
+                }
+                composable(
+                    route = Routes.LOST_FOUND_EDIT,
+                    arguments = listOf(navArgument("itemId") { type = NavType.IntType }),
+                ) { entry ->
+                    val itemId = entry.arguments?.getInt("itemId") ?: 0
+                    LostFoundEditScreen(
+                        itemId = itemId,
+                        onBack = { navController.popBackStack() },
+                        onSaved = { navController.popBackStack() },
                     )
                 }
                 composable(Routes.LOST_FOUND_PUBLISH) {
