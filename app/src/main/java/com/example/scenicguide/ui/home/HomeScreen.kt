@@ -77,6 +77,7 @@ fun HomeScreen(
     onOpenChat: () -> Unit,
     onLoggedOut: () -> Unit,
     onOpenProfile: () -> Unit,
+    onOpenPoiList: () -> Unit,
 ) {
     val container = rememberAppContainer()
     val viewModel: HomeViewModel = viewModel(
@@ -112,6 +113,7 @@ fun HomeScreen(
                 content = current.content,
                 onOpenChat = onOpenChat,
                 onOpenProfile = onOpenProfile,
+                onOpenPoiList = onOpenPoiList,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -123,6 +125,7 @@ private fun HomeContentView(
     content: HomeContent,
     onOpenChat: () -> Unit,
     onOpenProfile: () -> Unit,
+    onOpenPoiList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -175,9 +178,9 @@ private fun HomeContentView(
             }
         }
 
-        // 快捷入口 = 后端下发的入口 + 本地「个人中心」（个人中心页面归 A，这里只放入口）
+        // 快捷入口 = 后端下发的入口（按 path 映射）+ 本地兜底的「景点」「个人中心」
         item { SectionTitle("快捷入口") }
-        item { QuickEntryRow(content.quickEntries, onOpenProfile) }
+        item { QuickEntryRow(content.quickEntries, onOpenProfile, onOpenPoiList) }
 
         if (content.hotPois.isNotEmpty()) {
             item { SectionTitle("热门景点") }
@@ -286,25 +289,49 @@ private fun BannerPager(banners: List<Banner>) {
     }
 }
 
+/** 后端 quickEntries[].path：景点列表由 C 提供，/poi 与 /poi_list 都指向它 */
+private const val POI_PATH = "/poi"
+private const val POI_LIST_PATH = "/poi_list"
+
+private data class QuickEntryUi(
+    val label: String,
+    val tint: Color,
+    val onClick: (() -> Unit)?,
+)
+
 @Composable
-private fun QuickEntryRow(entries: List<QuickEntry>, onOpenProfile: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        entries.take(4).forEachIndexed { index, entry ->
-            QuickEntryItem(
-                label = entry.label,
-                tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first()),
-                modifier = Modifier.weight(1f),
-            )
-        }
-        QuickEntryItem(
-            label = "个人中心",
-            tint = MaterialTheme.colorScheme.primary,
-            onClick = onOpenProfile,
-            modifier = Modifier.weight(1f),
+private fun QuickEntryRow(
+    entries: List<QuickEntry>,
+    onOpenProfile: () -> Unit,
+    onOpenPoiList: () -> Unit,
+) {
+    val hasPoiEntry = entries.any { it.path == POI_PATH || it.path == POI_LIST_PATH }
+    val items = entries.take(4).mapIndexed { index, entry ->
+        QuickEntryUi(
+            label = entry.label,
+            tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first()),
+            onClick = if (entry.path == POI_PATH || entry.path == POI_LIST_PATH) onOpenPoiList else null,
         )
+    }.toMutableList()
+
+    // 后端没配景点入口时本地兜一个，保证首页始终能进景点列表
+    if (!hasPoiEntry) items += QuickEntryUi("景点", MaterialTheme.colorScheme.primary, onOpenPoiList)
+    items += QuickEntryUi("个人中心", MaterialTheme.colorScheme.primary, onOpenProfile)
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        items.chunked(3).forEach { rowItems ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                rowItems.forEach { item ->
+                    QuickEntryItem(
+                        label = item.label,
+                        tint = item.tint,
+                        onClick = item.onClick,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
     }
 }
 

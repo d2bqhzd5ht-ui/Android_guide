@@ -35,6 +35,7 @@ object Routes {
     const val HOME = "home"
     const val CHAT = "chat"
     const val PROFILE = "profile"
+    const val POI_LIST = "poi_list"
 }
 
 @Composable
@@ -100,6 +101,7 @@ fun AppRoot() {
                     HomeScreen(
                         onOpenChat = { navController.navigate(Routes.CHAT) },
                         onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                        onOpenPoiList = { navController.navigate(Routes.POI_LIST) },
                         onLoggedOut = {
                             navController.navigate(Routes.LOGIN) {
                                 popUpTo(navController.graph.id) { inclusive = true }
@@ -112,7 +114,19 @@ fun AppRoot() {
                 }
                 // 个人中心页面是 A 的，这里只提供可导航的占位；A 的 ProfileScreen 落地后替换本段
                 composable(Routes.PROFILE) {
-                    ProfileRoutePlaceholder(onBack = { navController.popBackStack() })
+                    RoutePlaceholder(
+                        title = "个人中心",
+                        hint = "路由已就位，页面由 A 实现",
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                // 景点列表页面是 C 的，这里只提供可导航的占位；C 的 PoiListScreen 落地后替换本段
+                composable(Routes.POI_LIST) {
+                    RoutePlaceholder(
+                        title = "景点列表",
+                        hint = "路由已就位，页面由 C 实现",
+                        onBack = { navController.popBackStack() },
+                    )
                 }
             }
         }
@@ -120,11 +134,11 @@ fun AppRoot() {
 }
 
 /**
- * 只负责让 Routes.PROFILE 可导航，不实现个人中心内容。
- * A 的 ProfileScreen 合并后，把上面 composable(Routes.PROFILE) 里的调用换掉即可。
+ * 只负责让 PENDING 的路由可导航，不实现队友页面的内容。
+ * A / C 的屏幕合并后，把对应的 composable(...) 里的调用换掉即可。
  */
 @Composable
-private fun ProfileRoutePlaceholder(onBack: () -> Unit) {
+private fun RoutePlaceholder(title: String, hint: String, onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -132,14 +146,14 @@ private fun ProfileRoutePlaceholder(onBack: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "个人中心", style = MaterialTheme.typography.titleLarge)
+        Text(text = title, style = MaterialTheme.typography.titleLarge)
         Text(
-            text = "路由已就位，页面由 A 实现",
+            text = hint,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 8.dp),
         )
         TextButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
-            Text("返回首页")
+            Text("返回")
         }
     }
 }
