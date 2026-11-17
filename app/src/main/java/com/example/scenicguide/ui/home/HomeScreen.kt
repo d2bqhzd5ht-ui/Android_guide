@@ -81,6 +81,7 @@ fun HomeScreen(
     onOpenChat: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenLostFound: () -> Unit,
+    onOpenPoiList: () -> Unit = {},
 ) {
     val container = rememberAppContainer()
     val viewModel: HomeViewModel = viewModel(
