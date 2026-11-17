@@ -203,7 +203,7 @@ private fun LostFoundCard(item: LostFoundItem, onClick: () -> Unit) {
             )
 
             val meta = listOfNotNull(
-                item.category?.takeIf { it.isNotBlank() },
+                item.category.takeIf { it.isNotBlank() && it != LostFoundItem.CATEGORY_OTHER },
                 item.location?.takeIf { it.isNotBlank() },
             ).joinToString(" · ")
             if (meta.isNotBlank()) {

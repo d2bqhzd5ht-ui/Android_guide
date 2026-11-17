@@ -127,7 +127,7 @@ private fun DetailContent(
                 )
                 .padding(horizontal = 16.dp, vertical = 4.dp),
         ) {
-            InfoRow("分类", item.category)
+            InfoRow("分类", item.category.takeIf { it != LostFoundItem.CATEGORY_OTHER })
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             InfoRow("地点", item.location)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

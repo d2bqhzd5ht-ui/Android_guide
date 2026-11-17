@@ -4,9 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 失物招领数据模型，字段以 docs/交接.md 1.2 节为准：
- * { id, type, title, category?, description?, location?, image_url?, contact?,
- *   publisher_name?, user_id?, status, created_at?, updated_at? }
+ * 失物招领数据模型，字段与后端 `SELECT *` 结果一致（全 snake_case）：
+ * { id, type, category, title, description?, location?, image_url?, contact?,
+ *   publisher_name?, user_id?, status, created_at, updated_at? }
  *
  * 后端没有统一格式化时间字段，这里保留原始字符串，展示前由 [formatLostFoundTime] 处理。
  */
@@ -16,7 +16,8 @@ data class LostFoundItem(
     /** lost = 寻物启事，found = 招领启事 */
     val type: String = TYPE_LOST,
     val title: String = "",
-    val category: String? = null,
+    /** 后端默认 "other"，不会是 null */
+    val category: String = CATEGORY_OTHER,
     val description: String? = null,
     val location: String? = null,
     @SerialName("image_url") val imageUrl: String? = null,
@@ -43,25 +44,28 @@ data class LostFoundItem(
         const val STATUS_OPEN = "open"
         const val STATUS_RESOLVED = "resolved"
         const val STATUS_EXPIRED = "expired"
+
+        const val CATEGORY_OTHER = "other"
     }
 }
 
 /**
- * 分页列表。接口文档没写死分页字段名（只写了「分页列表」），
- * 这里同时兜住 list / records / items 三种常见命名，取第一个非空的。
+ * 列表响应：`data = { list, pagination: { page, size, total, totalPages } }`，
+ * 分页信息嵌在 pagination 里，不再是平铺字段。
  */
 @Serializable
 data class LostFoundPage(
     val list: List<LostFoundItem> = emptyList(),
-    val records: List<LostFoundItem> = emptyList(),
-    val items: List<LostFoundItem> = emptyList(),
-    val total: Int = 0,
+    val pagination: LostFoundPagination = LostFoundPagination(),
+)
+
+@Serializable
+data class LostFoundPagination(
     val page: Int = 1,
-    val size: Int = 20,
-) {
-    val entries: List<LostFoundItem>
-        get() = list.ifEmpty { records.ifEmpty { items } }
-}
+    val size: Int = 10,
+    val total: Int = 0,
+    @SerialName("totalPages") val totalPages: Int = 0,
+)
 
 /** 新建 / 更新时的请求体，type 与 title 必填，其余可空（后端会忽略空值）。 */
 @Serializable
@@ -78,6 +82,13 @@ data class LostFoundDraft(
 
 @Serializable
 data class LostFoundStatusRequest(val status: String)
+
+/** PATCH /status 只返回 { id, status }，不是完整记录 */
+@Serializable
+data class LostFoundStatusResult(
+    val id: Int = 0,
+    val status: String = "",
+)
 
 /**
  * 后端时间字段原样返回（可能是 `2026-11-15T13:28:00.000Z`，也可能是 `2026-11-15 13:28:00`），

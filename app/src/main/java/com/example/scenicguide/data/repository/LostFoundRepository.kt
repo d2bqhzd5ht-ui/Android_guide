@@ -6,6 +6,7 @@ import com.example.scenicguide.data.model.LostFoundDraft
 import com.example.scenicguide.data.model.LostFoundItem
 import com.example.scenicguide.data.model.LostFoundPage
 import com.example.scenicguide.data.model.LostFoundStatusRequest
+import com.example.scenicguide.data.model.LostFoundStatusResult
 import com.example.scenicguide.data.remote.LostFoundApi
 
 class LostFoundRepository(private val api: LostFoundApi) {
@@ -24,7 +25,7 @@ class LostFoundRepository(private val api: LostFoundApi) {
 
     suspend fun create(draft: LostFoundDraft): ApiResult<LostFoundItem> = apiCall { api.create(draft) }
 
-    suspend fun updateStatus(id: Int, status: String): ApiResult<LostFoundItem> = apiCall {
+    suspend fun updateStatus(id: Int, status: String): ApiResult<LostFoundStatusResult> = apiCall {
         api.updateStatus(id, LostFoundStatusRequest(status))
     }
 }
