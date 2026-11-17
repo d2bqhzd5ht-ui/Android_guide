@@ -90,6 +90,12 @@ data class LostFoundStatusResult(
     val status: String = "",
 )
 
+/** DELETE 返回 { id } */
+@Serializable
+data class LostFoundDeleteResult(
+    val id: Int = 0,
+)
+
 /**
  * 后端时间字段原样返回（可能是 `2026-11-15T13:28:00.000Z`，也可能是 `2026-11-15 13:28:00`），
  * 统一截成 `yyyy-MM-dd HH:mm`；解析不了就原样返回。

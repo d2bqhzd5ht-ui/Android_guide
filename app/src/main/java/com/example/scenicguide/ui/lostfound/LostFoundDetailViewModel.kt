@@ -25,6 +25,7 @@ class LostFoundDetailViewModel(
         ) : UiState
 
         data class Error(val message: String) : UiState
+        data object Deleted : UiState
     }
 
     private val _state = MutableStateFlow<UiState>(UiState.Loading)
@@ -50,12 +51,26 @@ class LostFoundDetailViewModel(
         viewModelScope.launch {
             _state.value = current.copy(updating = true, actionError = null)
             when (val result = repository.updateStatus(itemId, status)) {
-                // PATCH /status 只回 { id, status }，本地合并即可，不用再拉一次详情
+                // PATCH /status 只回 { id, status }，本地 merge 即可，不用再拉一次详情
                 is ApiResult.Success -> _state.value = UiState.Success(
                     item = current.item.copy(status = result.data.status.ifBlank { status }),
                     updating = false,
                 )
+                is ApiResult.Failure -> _state.value = current.copy(updating = false, actionError = result.error.message)
+            }
+        }
+    }
 
+    fun delete(onDeleted: () -> Unit = {}) {
+        val current = _state.value as? UiState.Success ?: return
+        if (current.updating) return
+        viewModelScope.launch {
+            _state.value = current.copy(updating = true, actionError = null)
+            when (val result = repository.delete(itemId)) {
+                is ApiResult.Success -> {
+                    _state.value = UiState.Deleted
+                    onDeleted()
+                }
                 is ApiResult.Failure -> _state.value = current.copy(updating = false, actionError = result.error.message)
             }
         }
