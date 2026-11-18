@@ -93,6 +93,13 @@ const homeData = {
   stats: { totalInteractions: 0, todayInteractions: 0, positiveRate: 0 },
 }
 
+// 景点数据：字段与真实后端一致（status 为 1/0 整数，category 为中文展示名）
+const poiList = [
+  { id: 1, name: '灵隐寺', category: '人文古迹', description: '始建于东晋，江南著名古刹。', location: '西湖区法云弄1号', longitude: 120.101, latitude: 30.241, status: 1, created_at: '2026-01-01 09:00:00' },
+  { id: 2, name: '九溪十八涧', category: '自然风光', description: '溪流蜿蜒，适合徒步。', location: '西湖区九溪路', longitude: 120.117, latitude: 30.196, status: 1, created_at: '2026-01-01 09:00:00' },
+  { id: 3, name: '雷峰塔', category: '人文古迹', description: '夕照雷峰，西湖十景之一。', location: '西湖区南山路15号', longitude: 120.149, latitude: 30.231, status: 1, created_at: '2026-01-01 09:00:00' },
+]
+
 const streamingSessions = new Map() // sessionId -> { aborted }
 
 // 失物招领内存数据（与真实后端字段一致：type / title / category / description /
@@ -327,7 +334,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (path === '/api/v1/poi' && method === 'GET') {
-    return ok(res, homeData.hotPois.map((p) => ({ ...p, status: 'online' })))
+    const category = url.searchParams.get('category')
+    const list = category ? poiList.filter((p) => p.category === category) : poiList
+    return ok(res, list.map(({ id, name, category: c, description, location, status }) => ({ id, name, category: c, description, location, status })))
+  }
+
+  const poiDetail = path.match(/^\/api\/v1\/poi\/(\d+)$/)
+  if (poiDetail && method === 'GET') {
+    const poi = poiList.find((p) => p.id === Number(poiDetail[1]))
+    if (!poi) return fail(res, 404, 40401, '景点不存在')
+    return ok(res, poi)
   }
 
   fail(res, 404, 40401, `mock 未实现该接口：${method} ${path}`)
