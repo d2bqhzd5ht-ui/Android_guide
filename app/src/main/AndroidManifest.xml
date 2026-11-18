@@ -3,13 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- 语音链路（A 负责）：前台 Service 所需权限先行报备，A 的 Service 类落地后无需再改 Manifest -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".ScenicGuideApplication"
@@ -31,7 +29,6 @@
             </intent-filter>
         </activity>
 
-        <!-- 语音前台 Service：A 的 voice/VoiceForegroundService.kt 合并后即可直接使用 -->
         <service
             android:name=".voice.VoiceForegroundService"
             android:exported="false"

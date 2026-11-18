@@ -38,12 +38,6 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
 
     fun onInputChange(value: String) = _state.update { it.copy(input = value) }
 
-    /** 语音识别结果回填：接在输入框已有文字后面，由用户确认后自己点发送 */
-    fun appendInput(text: String) {
-        if (text.isBlank()) return
-        _state.update { it.copy(input = it.input + text) }
-    }
-
     fun dismissError() = _state.update { it.copy(error = null) }
 
     fun send(text: String = _state.value.input) {

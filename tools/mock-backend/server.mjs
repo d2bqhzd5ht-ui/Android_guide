@@ -95,6 +95,56 @@ const homeData = {
 
 const streamingSessions = new Map() // sessionId -> { aborted }
 
+// 失物招领内存数据（与真实后端字段一致：type / title / category / description /
+// location / image_url / contact / publisher_name / user_id / status / created_at）
+let nextLostFoundId = 1
+function addLostFoundType(item) {
+  return { id: nextLostFoundId++, status: 'open', created_at: new Date().toISOString(), ...item }
+}
+const lostFound = [
+  addLostFoundType({
+    type: 'lost',
+    title: '黑色雨伞遗失在断桥附近',
+    category: '雨伞',
+    description: '长柄黑伞，伞柄有一圈银色装饰，下午在断桥拍照时落在长椅上。',
+    location: '断桥残雪',
+    contact: '13800000001',
+    publisher_name: '演示用户',
+    user_id: '1',
+  }),
+  addLostFoundType({
+    type: 'found',
+    title: '捡到一串钥匙，挂着橙色小熊',
+    category: '钥匙',
+    description: '在灵隐寺停车场出口捡到，已交给游客中心，可凭描述认领。',
+    location: '灵隐寺停车场',
+    contact: '游客中心 0571-88888888',
+    publisher_name: '工作人员',
+    user_id: '2',
+  }),
+  addLostFoundType({
+    type: 'lost',
+    title: '儿童水杯（粉色）不见了',
+    category: '水杯',
+    description: '粉红色保温杯，杯身贴有卡通贴纸，可能落在雷峰塔二层休息区。',
+    location: '雷峰塔',
+    contact: '13900000002',
+    publisher_name: '演示用户',
+    user_id: '1',
+  }),
+  addLostFoundType({
+    type: 'found',
+    title: '捡到一张学生卡',
+    category: '证件',
+    description: '姓名部分已模糊，请失主到九溪游客驿站认领。',
+    location: '九溪十八涧',
+    contact: '九溪游客驿站',
+    publisher_name: '志愿者',
+    user_id: '3',
+    status: 'resolved',
+  }),
+]
+
 const CANNED_ANSWER =
   '灵隐寺始建于东晋咸和元年（公元326年），是杭州最早的名刹之一。' +
   '相传印度僧人慧理来到这里，见山峰奇秀，以为“仙灵所隐”，便在此建寺，取名灵隐。' +
@@ -209,6 +259,71 @@ const server = http.createServer(async (req, res) => {
       streamingSessions.get(body.sessionId).aborted = true
     }
     return ok(res, { sessionId: body.sessionId || '', stopped: true })
+  }
+
+  if (path === '/api/v1/lost-found' && method === 'GET') {
+    const type = url.searchParams.get('type')
+    const status = url.searchParams.get('status')
+    const keyword = url.searchParams.get('keyword')
+    const page = Math.max(1, Number(url.searchParams.get('page') || 1))
+    // 真实后端 size 上限 50，默认 10
+    const size = Math.min(50, Math.max(1, Number(url.searchParams.get('size') || 10)))
+
+    const rows = lostFound.filter((item) => {
+      if (type && item.type !== type) return false
+      if (status && item.status !== status) return false
+      if (keyword) {
+        const haystack = `${item.title} ${item.description || ''} ${item.location || ''}`
+        if (!haystack.includes(keyword)) return false
+      }
+      return true
+    })
+
+    const start = (page - 1) * size
+    return ok(res, { list: rows.slice(start, start + size), total: rows.length, page, size })
+  }
+
+  if (path === '/api/v1/lost-found' && method === 'POST') {
+    const body = await readBody(req)
+    if (!body.type || !body.title) {
+      return fail(res, 400, 40001, 'type 和 title 为必填项')
+    }
+    if (!['lost', 'found'].includes(body.type)) {
+      return fail(res, 400, 40001, 'type 只能是 lost 或 found')
+    }
+    const item = addLostFoundType({
+      type: body.type,
+      title: body.title,
+      category: body.category || null,
+      description: body.description || null,
+      location: body.location || null,
+      image_url: body.image_url || null,
+      contact: body.contact || null,
+      publisher_name: body.publisher_name || null,
+      user_id: body.user_id || null,
+    })
+    lostFound.unshift(item)
+    return ok(res, item, 201)
+  }
+
+  const lostFoundDetailMatch = path.match(/^\/api\/v1\/lost-found\/(\d+)$/)
+  if (lostFoundDetailMatch && method === 'GET') {
+    const item = lostFound.find((row) => row.id === Number(lostFoundDetailMatch[1]))
+    if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
+    return ok(res, item)
+  }
+
+  const lostFoundStatusMatch = path.match(/^\/api\/v1\/lost-found\/(\d+)\/status$/)
+  if (lostFoundStatusMatch && method === 'PATCH') {
+    const body = await readBody(req)
+    if (!['open', 'resolved', 'expired'].includes(body.status)) {
+      return fail(res, 400, 40001, 'status 只能是 open / resolved / expired')
+    }
+    const item = lostFound.find((row) => row.id === Number(lostFoundStatusMatch[1]))
+    if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
+    item.status = body.status
+    item.updated_at = new Date().toISOString()
+    return ok(res, item)
   }
 
   if (path === '/api/v1/poi' && method === 'GET') {

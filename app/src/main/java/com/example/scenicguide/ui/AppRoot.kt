@@ -1,6 +1,5 @@
 package com.example.scenicguide.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,7 +8,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,21 +19,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.scenicguide.ScenicGuideApplication
 import com.example.scenicguide.core.di.AppContainer
 import com.example.scenicguide.ui.chat.ChatScreen
 import com.example.scenicguide.ui.home.HomeScreen
 import com.example.scenicguide.ui.login.LoginScreen
+import com.example.scenicguide.ui.lostfound.LostFoundDetailScreen
+import com.example.scenicguide.ui.lostfound.LostFoundListScreen
+import com.example.scenicguide.ui.lostfound.LostFoundPublishScreen
+import com.example.scenicguide.ui.poi.PoiDetailScreen
+import com.example.scenicguide.ui.poi.PoiListScreen
+import com.example.scenicguide.ui.profile.ProfileScreen
 
 object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val CHAT = "chat"
     const val PROFILE = "profile"
+    const val LOST_FOUND = "lost_found"
+    const val LOST_FOUND_DETAIL = "lost_found/{itemId}"
+    const val LOST_FOUND_PUBLISH = "lost_found_publish"
     const val POI_LIST = "poi_list"
+    const val POI_DETAIL = "poi/{poiId}"
+
+    fun lostFoundDetail(itemId: Int) = "lost_found/$itemId"
+    fun poiDetail(poiId: Int) = "poi/$poiId"
 }
 
 @Composable
@@ -101,7 +114,41 @@ fun AppRoot() {
                     HomeScreen(
                         onOpenChat = { navController.navigate(Routes.CHAT) },
                         onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                        onOpenLostFound = { navController.navigate(Routes.LOST_FOUND) },
                         onOpenPoiList = { navController.navigate(Routes.POI_LIST) },
+                    )
+                }
+                composable(Routes.LOST_FOUND) {
+                    LostFoundListScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenDetail = { itemId ->
+                            navController.navigate(Routes.lostFoundDetail(itemId))
+                        },
+                        onPublish = { navController.navigate(Routes.LOST_FOUND_PUBLISH) },
+                    )
+                }
+                composable(
+                    route = Routes.LOST_FOUND_DETAIL,
+                    arguments = listOf(navArgument("itemId") { type = NavType.IntType }),
+                ) { entry ->
+                    val itemId = entry.arguments?.getInt("itemId") ?: 0
+                    LostFoundDetailScreen(
+                        itemId = itemId,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable(Routes.LOST_FOUND_PUBLISH) {
+                    LostFoundPublishScreen(
+                        onBack = { navController.popBackStack() },
+                        onPublished = { navController.popBackStack() },
+                    )
+                }
+                composable(Routes.CHAT) {
+                    ChatScreen(onBack = { navController.popBackStack() })
+                }
+                composable(Routes.PROFILE) {
+                    ProfileScreen(
+                        onBack = { navController.popBackStack() },
                         onLoggedOut = {
                             navController.navigate(Routes.LOGIN) {
                                 popUpTo(navController.graph.id) { inclusive = true }
@@ -109,51 +156,25 @@ fun AppRoot() {
                         },
                     )
                 }
-                composable(Routes.CHAT) {
-                    ChatScreen(onBack = { navController.popBackStack() })
-                }
-                // 个人中心页面是 A 的，这里只提供可导航的占位；A 的 ProfileScreen 落地后替换本段
-                composable(Routes.PROFILE) {
-                    RoutePlaceholder(
-                        title = "个人中心",
-                        hint = "路由已就位，页面由 A 实现",
+                composable(Routes.POI_LIST) {
+                    PoiListScreen(
                         onBack = { navController.popBackStack() },
+                        onOpenDetail = { poiId ->
+                            navController.navigate(Routes.poiDetail(poiId))
+                        },
                     )
                 }
-                // 景点列表页面是 C 的，这里只提供可导航的占位；C 的 PoiListScreen 落地后替换本段
-                composable(Routes.POI_LIST) {
-                    RoutePlaceholder(
-                        title = "景点列表",
-                        hint = "路由已就位，页面由 C 实现",
+                composable(
+                    route = Routes.POI_DETAIL,
+                    arguments = listOf(navArgument("poiId") { type = NavType.IntType }),
+                ) { entry ->
+                    val poiId = entry.arguments?.getInt("poiId") ?: 0
+                    PoiDetailScreen(
+                        poiId = poiId,
                         onBack = { navController.popBackStack() },
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * 只负责让 PENDING 的路由可导航，不实现队友页面的内容。
- * A / C 的屏幕合并后，把对应的 composable(...) 里的调用换掉即可。
- */
-@Composable
-private fun RoutePlaceholder(title: String, hint: String, onBack: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(text = title, style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = hint,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        TextButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
-            Text("返回")
         }
     }
 }

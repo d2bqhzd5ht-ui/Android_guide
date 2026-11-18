@@ -55,6 +55,12 @@ private val bannerBrushes = listOf(
 
 private val hexPattern = Regex("#[0-9a-fA-F]{6}")
 
+/** 后端 quickEntries[].path 的目标路由（与后台配置保持一致） */
+private const val LOST_FOUND_PATH = "/lost-found"
+private const val CHAT_PATH = "/interaction"
+private const val POI_PATH = "/poi"
+private const val POI_LIST_PATH = "/poi_list"
+
 /** 后端 banners.color 是 CSS 串（如 linear-gradient(135deg, #1989fa, #4db8ff)），取其中的色值来画渐变 */
 private fun bannerBrush(css: String, fallback: List<Color>): Brush {
     val colors = hexPattern.findAll(css)
@@ -75,9 +81,9 @@ private fun hexColor(hex: String, fallback: Color): Color =
 @Composable
 fun HomeScreen(
     onOpenChat: () -> Unit,
-    onLoggedOut: () -> Unit,
     onOpenProfile: () -> Unit,
-    onOpenPoiList: () -> Unit,
+    onOpenLostFound: () -> Unit,
+    onOpenPoiList: () -> Unit = {},
 ) {
     val container = rememberAppContainer()
     val viewModel: HomeViewModel = viewModel(
@@ -90,8 +96,8 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("景区导览", fontWeight = FontWeight.SemiBold) },
                 actions = {
-                    TextButton(onClick = { viewModel.logout(onLoggedOut) }) {
-                        Text("退出")
+                    TextButton(onClick = onOpenProfile) {
+                        Text("我的")
                     }
                 },
             )
@@ -112,7 +118,7 @@ fun HomeScreen(
             is HomeViewModel.UiState.Success -> HomeContentView(
                 content = current.content,
                 onOpenChat = onOpenChat,
-                onOpenProfile = onOpenProfile,
+                onOpenLostFound = onOpenLostFound,
                 onOpenPoiList = onOpenPoiList,
                 modifier = Modifier.padding(padding),
             )
@@ -124,8 +130,8 @@ fun HomeScreen(
 private fun HomeContentView(
     content: HomeContent,
     onOpenChat: () -> Unit,
-    onOpenProfile: () -> Unit,
-    onOpenPoiList: () -> Unit,
+    onOpenLostFound: () -> Unit,
+    onOpenPoiList: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -178,9 +184,22 @@ private fun HomeContentView(
             }
         }
 
-        // 快捷入口 = 后端下发的入口（按 path 映射）+ 本地兜底的「景点」「个人中心」
-        item { SectionTitle("快捷入口") }
-        item { QuickEntryRow(content.quickEntries, onOpenProfile, onOpenPoiList) }
+        if (content.quickEntries.isNotEmpty()) {
+            item { SectionTitle("快捷入口") }
+            item {
+                QuickEntryRow(
+                    entries = content.quickEntries,
+                    onEntryClick = { entry ->
+                        when (entry.path) {
+                            LOST_FOUND_PATH -> onOpenLostFound()
+                            CHAT_PATH -> onOpenChat()
+                            POI_PATH, POI_LIST_PATH -> onOpenPoiList()
+                            else -> Unit
+                        }
+                    },
+                )
+            }
+        }
 
         if (content.hotPois.isNotEmpty()) {
             item { SectionTitle("热门景点") }
@@ -289,82 +308,41 @@ private fun BannerPager(banners: List<Banner>) {
     }
 }
 
-/** 后端 quickEntries[].path：景点列表由 C 提供，/poi 与 /poi_list 都指向它 */
-private const val POI_PATH = "/poi"
-private const val POI_LIST_PATH = "/poi_list"
-
-private data class QuickEntryUi(
-    val label: String,
-    val tint: Color,
-    val onClick: (() -> Unit)?,
-)
-
 @Composable
-private fun QuickEntryRow(
-    entries: List<QuickEntry>,
-    onOpenProfile: () -> Unit,
-    onOpenPoiList: () -> Unit,
-) {
-    val hasPoiEntry = entries.any { it.path == POI_PATH || it.path == POI_LIST_PATH }
-    val items = entries.take(4).mapIndexed { index, entry ->
-        QuickEntryUi(
-            label = entry.label,
-            tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first()),
-            onClick = if (entry.path == POI_PATH || entry.path == POI_LIST_PATH) onOpenPoiList else null,
-        )
-    }.toMutableList()
-
-    // 后端没配景点入口时本地兜一个，保证首页始终能进景点列表
-    if (!hasPoiEntry) items += QuickEntryUi("景点", MaterialTheme.colorScheme.primary, onOpenPoiList)
-    items += QuickEntryUi("个人中心", MaterialTheme.colorScheme.primary, onOpenProfile)
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items.chunked(3).forEach { rowItems ->
-            Row(modifier = Modifier.fillMaxWidth()) {
-                rowItems.forEach { item ->
-                    QuickEntryItem(
-                        label = item.label,
-                        tint = item.tint,
-                        onClick = item.onClick,
-                        modifier = Modifier.weight(1f),
+private fun QuickEntryRow(entries: List<QuickEntry>, onEntryClick: (QuickEntry) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        entries.take(4).forEachIndexed { index, entry ->
+            val tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first())
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onEntryClick(entry) },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(tint.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = entry.label.take(1).ifBlank { "·" },
+                        color = tint,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
-                repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun QuickEntryItem(
-    label: String,
-    tint: Color,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(tint.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = label.take(1).ifBlank { "·" },
-                color = tint,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(top = 6.dp),
-        )
     }
 }
 

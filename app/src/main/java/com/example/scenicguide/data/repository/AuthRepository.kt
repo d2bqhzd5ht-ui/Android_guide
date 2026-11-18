@@ -46,4 +46,22 @@ class AuthRepository(
     }
 
     suspend fun logout() = sessionManager.logout()
+
+    /** 个人中心刷新资料：拉取 /auth/me 并同步本地登录态 */
+    suspend fun refreshProfile(): ApiResult<SessionUser> {
+        val result = apiCall { api.me() }
+        return when (result) {
+            is ApiResult.Failure -> {
+                if (result.error.unauthorized) sessionManager.onUnauthorized()
+                result
+            }
+
+            is ApiResult.Success -> {
+                val current = sessionManager.session.value
+                val user = result.data.toSessionUser(current?.user?.username.orEmpty())
+                if (current != null) sessionManager.save(current.copy(user = user))
+                ApiResult.Success(user)
+            }
+        }
+    }
 }
