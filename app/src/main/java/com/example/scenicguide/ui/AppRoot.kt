@@ -1,5 +1,6 @@
 package com.example.scenicguide.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,9 +75,11 @@ fun AppRoot() {
         }
     }
 
-    // 任意接口返回 40101 / 40102 → 清登录态 + 回登录页
+    // 任意接口返回 40101 / 40102 → 清登录态 + 提示 + 回登录页
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         container.sessionManager.unauthorized.collect {
+            Toast.makeText(context, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
             navController.navigate(Routes.LOGIN) {
                 popUpTo(navController.graph.id) { inclusive = true }
                 launchSingleTop = true
