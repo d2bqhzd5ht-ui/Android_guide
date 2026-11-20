@@ -58,6 +58,8 @@ private val hexPattern = Regex("#[0-9a-fA-F]{6}")
 /** 后端 quickEntries[].path 的目标路由（与后台配置保持一致） */
 private const val LOST_FOUND_PATH = "/lost-found"
 private const val CHAT_PATH = "/interaction"
+private const val POI_PATH = "/poi"
+private const val POI_LIST_PATH = "/poi_list"
 
 /** 后端 banners.color 是 CSS 串（如 linear-gradient(135deg, #1989fa, #4db8ff)），取其中的色值来画渐变 */
 private fun bannerBrush(css: String, fallback: List<Color>): Brush {
@@ -117,6 +119,7 @@ fun HomeScreen(
                 content = current.content,
                 onOpenChat = onOpenChat,
                 onOpenLostFound = onOpenLostFound,
+                onOpenPoiList = onOpenPoiList,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -128,6 +131,7 @@ private fun HomeContentView(
     content: HomeContent,
     onOpenChat: () -> Unit,
     onOpenLostFound: () -> Unit,
+    onOpenPoiList: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -189,6 +193,7 @@ private fun HomeContentView(
                         when (entry.path) {
                             LOST_FOUND_PATH -> onOpenLostFound()
                             CHAT_PATH -> onOpenChat()
+                            POI_PATH, POI_LIST_PATH -> onOpenPoiList()
                             else -> Unit
                         }
                     },
