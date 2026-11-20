@@ -112,14 +112,14 @@ private fun PoiDetailContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        // 顶部 Hero 区：有 image_url 则全幅加载，否则 fallback 到类别渐变色
+        // 顶部 Hero 区：图片 + 深色渐变蒙层 + 景点名/类别叠在上面
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(240.dp)
                 .background(detailBrushFor(poi.category)),
-            contentAlignment = Alignment.Center,
         ) {
+            // 底层：图片 或 首字母大字
             val url = poi.imageUrl?.takeIf { it.isNotBlank() }
             if (url != null) {
                 AsyncImage(
@@ -129,41 +129,68 @@ private fun PoiDetailContent(
                     contentScale = ContentScale.Crop,
                 )
             } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = poi.name.take(1).ifBlank { "·" },
+                        color = Color.White.copy(alpha = 0.5f),
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
+            // 深色渐变蒙层（底部向上），保证叠在上层文字可读
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.15f),
+                                Color.Black.copy(alpha = 0.55f),
+                            ),
+                            startY = 0f,
+                            endY = Float.POSITIVE_INFINITY,
+                        ),
+                    ),
+            )
+
+            // 叠在上面的景点名 + 类别
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 20.dp, end = 16.dp, bottom = 16.dp),
+            ) {
+                Card(
+                    shape = RoundedCornerShape(999.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.25f),
+                    ),
+                ) {
+                    Text(
+                        text = poi.category.categoryDisplayName(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
                 Text(
-                    text = poi.name.take(1).ifBlank { "·" },
-                    color = Color.White.copy(alpha = 0.6f),
-                    style = MaterialTheme.typography.displayLarge,
+                    text = poi.name,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
         }
 
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            // 景点名
-            Text(
-                text = poi.name,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-
-            // 类别标签
-            Card(
-                shape = RoundedCornerShape(999.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-                modifier = Modifier.padding(top = 8.dp),
-            ) {
-                Text(
-                    text = poi.category.categoryDisplayName(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(8.dp))
 
             // 描述
             poi.description?.takeIf { it.isNotBlank() }?.let {
