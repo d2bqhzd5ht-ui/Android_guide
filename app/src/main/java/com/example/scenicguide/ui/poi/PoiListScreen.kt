@@ -1,5 +1,11 @@
 package com.example.scenicguide.ui.poi
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,7 +50,6 @@ import com.example.scenicguide.data.model.PoiCategory
 import com.example.scenicguide.data.model.PoiListItem
 import com.example.scenicguide.data.model.categoryDisplayName
 import com.example.scenicguide.ui.components.ErrorView
-import com.example.scenicguide.ui.components.LoadingView
 import com.example.scenicguide.ui.rememberAppContainer
 
 /** 每个类别配一个主题渐变色 */
@@ -94,8 +98,7 @@ fun PoiListScreen(
         },
     ) { padding ->
         when (val current = state) {
-            is PoiListViewModel.UiState.Loading -> LoadingView(
-                text = "正在加载景点…",
+            is PoiListViewModel.UiState.Loading -> PoiListLoading(
                 modifier = Modifier.padding(padding),
             )
 
@@ -286,6 +289,130 @@ private fun PoiCard(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 骨架屏：加载时显示，体验比 LoadingView 更好
+// ---------------------------------------------------------------------------
+
+private const val SHIMMER_COLOR = 0xFFE0E0E0
+private const val SHIMMER_HIGHLIGHT = 0xFFF5F5F5
+
+/** 无限循环的 shimmer 渐变，从左到右扫过 */
+@Composable
+private fun shimmerBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val offset by transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "shimmer-offset",
+    )
+    return Brush.linearGradient(
+        colors = listOf(
+            Color(SHIMMER_COLOR),
+            Color(SHIMMER_HIGHLIGHT),
+            Color(SHIMMER_COLOR),
+        ),
+        start = androidx.compose.ui.geometry.Offset(offset, 0f),
+        end = androidx.compose.ui.geometry.Offset(offset + 1f, 0f),
+    )
+}
+
+@Composable
+private fun PoiListLoading(
+    modifier: Modifier = Modifier,
+) {
+    val shimmer = shimmerBrush()
+    Column(modifier = modifier.fillMaxSize()) {
+        // 类别筛选占位（5 个灰色圆角块）
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(5) {
+                Box(
+                    modifier = Modifier
+                        .width(64.dp)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(shimmer),
+                )
+            }
+        }
+
+        // 卡片骨架
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(5) {
+                SkeletonCard(shimmer)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkeletonCard(shimmer: Brush) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Row(modifier = Modifier.padding(16.dp)) {
+            // 左侧缩略图占位
+            Box(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(80.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(shimmer),
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                // 标题
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(shimmer),
+                )
+                // 类别标签
+                Box(
+                    modifier = Modifier
+                        .width(56.dp)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer)
+                        .padding(top = 6.dp),
+                )
+                // 描述两行
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer)
+                        .padding(top = 10.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer),
+                )
             }
         }
     }
