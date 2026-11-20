@@ -81,36 +81,9 @@ const homeData = {
     { icon: 'goods-o', label: '失物招领', path: '/lost-found', color: '#7232dd' },
   ],
   hotPois: [
-    {
-      id: 1,
-      name: '灵隐寺',
-      category: '人文古迹',
-      description: '始建于东晋，江南著名古刹。',
-      location: '西湖区法云弄1号',
-      longitude: 120.101,
-      latitude: 30.241,
-      image_url: 'https://picsum.photos/seed/lingyinsi/800/600',
-    },
-    {
-      id: 2,
-      name: '九溪十八涧',
-      category: '自然风光',
-      description: '溪流蜿蜒，适合徒步。',
-      location: '西湖区龙井村南九溪',
-      longitude: 120.118,
-      latitude: 30.196,
-      image_url: 'https://picsum.photos/seed/jiuxi/800/600',
-    },
-    {
-      id: 3,
-      name: '雷峰塔',
-      category: '人文古迹',
-      description: '夕照雷峰，西湖十景之一。',
-      location: '西湖区南山路15号',
-      longitude: 120.148,
-      latitude: 30.231,
-      image_url: 'https://picsum.photos/seed/leifengta/800/600',
-    },
+    { id: 1, name: '灵隐寺', category: '人文古迹', description: '始建于东晋，江南著名古刹。' },
+    { id: 2, name: '九溪十八涧', category: '自然风光', description: '溪流蜿蜒，适合徒步。' },
+    { id: 3, name: '雷峰塔', category: '人文古迹', description: '夕照雷峰，西湖十景之一。' },
   ],
   recommendedRoutes: [
     { id: 1, name: '西湖经典一日游', theme: '人文古迹', description: '断桥 → 白堤 → 孤山 → 岳庙', estimated_minutes: 360 },
@@ -171,6 +144,181 @@ const lostFound = [
     status: 'resolved',
   }),
 ]
+
+// ---------- multipart 解析（零依赖，只为抽出 name="audio" 的文件内容） ----------
+// 同时支持 CRLF 和 LF 换行，兼容 Android OkHttp 与 .NET HttpClient
+function parseMultipartBody(rawBuf, contentType) {
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;\s]+))/)
+  if (!boundaryMatch) return null
+  const boundary = (boundaryMatch[1] || boundaryMatch[2]).trim()
+  const delimiter = Buffer.from(`--${boundary}`)
+
+  function skipLf(buf, pos) {
+    if (buf[pos] === 0x0d && buf[pos + 1] === 0x0a) return pos + 2
+    if (buf[pos] === 0x0a) return pos + 1
+    return pos
+  }
+
+  const parts = []
+  let offset = 0
+  while (offset < rawBuf.length) {
+    const idx = rawBuf.indexOf(delimiter, offset)
+    if (idx === -1) break
+    offset = idx + delimiter.length
+    offset = skipLf(rawBuf, offset)
+    const nextIdx = rawBuf.indexOf(delimiter, offset)
+    if (nextIdx === -1) break
+    const part = rawBuf.slice(offset, nextIdx)
+    parts.push(part)
+    offset = nextIdx
+  }
+
+  // 找 header/body 分隔：优先 \r\n\r\n，没有就 \n\n
+  for (const part of parts) {
+    let sepIdx = part.indexOf('\r\n\r\n')
+    let sepBytes = 4
+    if (sepIdx === -1) {
+      sepIdx = part.indexOf('\n\n')
+      sepBytes = 2
+    }
+    if (sepIdx === -1) continue
+    const headerText = part.slice(0, sepIdx).toString('utf-8')
+    let body = part.slice(sepIdx + sepBytes)
+    // 去掉尾部换行
+    while (body.length > 0) {
+      if (body[body.length - 1] === 0x0a) {
+        body = body.slice(0, -1)
+        if (body[body.length - 1] === 0x0d) body = body.slice(0, -1)
+      } else break
+    }
+    const nameMatch = headerText.match(/name="?([^";]+)"?/)
+    const filenameMatch = headerText.match(/filename="?([^";]*)"?/)
+    if (nameMatch) {
+      return { name: nameMatch[1], filename: filenameMatch?.[1] || null, data: body }
+    }
+  }
+  return null
+}
+
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    req.on('data', (c) => chunks.push(c))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
+// ---------- mock TTS 音频生成：静音 WAV（够做播放链路验证） ----------
+// 16-bit PCM mono, sampleRateHz 采样率, seconds 秒的纯静音 WAV
+function generateSilentWav(seconds = 2, sampleRateHz = 22050, channels = 1, bitsPerSample = 16) {
+  const byteRate = (sampleRateHz * channels * bitsPerSample) / 8
+  const blockAlign = (channels * bitsPerSample) / 8
+  const dataSize = byteRate * seconds
+  const totalLen = 44 + dataSize
+
+  const buf = Buffer.alloc(totalLen)
+  let p = 0
+  buf.write('RIFF', p); p += 4
+  buf.writeUInt32LE(36 + dataSize, p); p += 4
+  buf.write('WAVE', p); p += 4
+  buf.write('fmt ', p); p += 4
+  buf.writeUInt32LE(16, p); p += 4
+  buf.writeUInt16LE(1, p); p += 2        // PCM
+  buf.writeUInt16LE(channels, p); p += 2
+  buf.writeUInt32LE(sampleRateHz, p); p += 4
+  buf.writeUInt32LE(byteRate, p); p += 4
+  buf.writeUInt16LE(blockAlign, p); p += 2
+  buf.writeUInt16LE(bitsPerSample, p); p += 2
+  buf.write('data', p); p += 4
+  buf.writeUInt32LE(dataSize, p); p += 4
+  // 数据区全部是 0 = 静音
+  return buf
+}
+
+// 预生成一段 mock 音频，切片 Base64
+const MOCK_TTS_WAV = generateSilentWav(1.5, 22050, 1, 16)
+const MOCK_TTS_SAMPLE_RATE = 22050
+
+function splitIntoChunks(buf, chunkSizeBytes = 512) {
+  const chunks = []
+  for (let i = 0; i < buf.length; i += chunkSizeBytes) {
+    chunks.push(buf.slice(i, Math.min(i + chunkSizeBytes, buf.length)))
+  }
+  return chunks
+}
+
+// mock 语音识别：任何音频都返回这段文本，可由 ASR_MOCK_TEXT 环境变量覆盖
+const ASR_MOCK_TEXT = process.env.ASR_MOCK_TEXT || '你好，这是一段模拟的语音识别结果。'
+
+// 每段 TTS mock 的模拟延迟（ms），让播放有“逐片到达”的体感
+const MOCK_TTS_CHUNK_DELAY_MS = process.env.MOCK_TTS_CHUNK_DELAY_MS
+  ? Number(process.env.MOCK_TTS_CHUNK_DELAY_MS)
+  : 30
+
+async function handleAsr(req, res) {
+  const contentType = req.headers['content-type'] || ''
+  if (!contentType.startsWith('multipart/form-data')) {
+    return fail(res, 400, 40002, 'Content-Type 必须是 multipart/form-data')
+  }
+  const rawBuf = await readRawBody(req)
+  const file = parseMultipartBody(rawBuf, contentType)
+  if (!file || file.name !== 'audio' || file.data.length === 0) {
+    return fail(res, 400, 40002, '缺少 audio 字段或文件为空')
+  }
+  console.log(`[ASR mock] 收到音频 ${file.data.length}B, 文件名=${file.filename}`)
+  return ok(res, { text: ASR_MOCK_TEXT })
+}
+
+async function handleTtsStream(req, res) {
+  const url = new URL(req.url, `http://${req.headers.host}`)
+  const text = (url.searchParams.get('text') || '').trim()
+  const lastSeq = Number(url.searchParams.get('lastSeq') || 0)
+
+  if (!text) {
+    return fail(res, 400, 40001, 'text 参数不能为空')
+  }
+  if (text.length > 500) {
+    return fail(res, 400, 40001, 'text 不能超过 500 字符')
+  }
+
+  const streamId = randomUUID()
+  const wav = MOCK_TTS_WAV
+  const allChunks = splitIntoChunks(wav, 512)
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Session-Id': streamId,
+    'X-Trace-Id': randomUUID(),
+  })
+
+  // meta 事件
+  res.write(`event: meta\ndata: ${JSON.stringify({
+    streamId,
+    text,
+    provider: 'mock',
+    sampleRate: MOCK_TTS_SAMPLE_RATE,
+    totalChunks: allChunks.length,
+    totalBytes: wav.length,
+  })}\n\n`)
+
+  // 从 lastSeq 开始发（续传场景）
+  for (let i = lastSeq; i < allChunks.length; i++) {
+    if (res.destroyed) return
+    const chunk = allChunks[i]
+    res.write(`event: audio\nid: ${i}\ndata: ${JSON.stringify({
+      seq: i,
+      chunk: chunk.toString('base64'),
+      byteLength: chunk.length,
+    })}\n\n`)
+    await sleep(MOCK_TTS_CHUNK_DELAY_MS)
+  }
+
+  res.write(`event: done\nid: ${allChunks.length}\ndata: {}\n\n`)
+  res.end()
+}
 
 const CANNED_ANSWER =
   '灵隐寺始建于东晋咸和元年（公元326年），是杭州最早的名刹之一。' +
@@ -288,6 +436,21 @@ const server = http.createServer(async (req, res) => {
     return ok(res, { sessionId: body.sessionId || '', stopped: true })
   }
 
+  if (path === '/api/v1/asr-tts/asr' && method === 'POST') {
+    return handleAsr(req, res)
+  }
+
+  // 兼容旧路径重定向（真实后端 307 到 /api/v1/tts/stream）
+  if (path === '/api/v1/asr-tts/tts/stream' && method === 'GET') {
+    const qs = new URL(req.url, `http://${req.headers.host}`).searchParams.toString()
+    res.writeHead(307, { Location: `/api/v1/tts/stream${qs ? '?' + qs : ''}` })
+    return res.end()
+  }
+
+  if (path === '/api/v1/tts/stream' && method === 'GET') {
+    return handleTtsStream(req, res)
+  }
+
   if (path === '/api/v1/lost-found' && method === 'GET') {
     const type = url.searchParams.get('type')
     const status = url.searchParams.get('status')
@@ -382,24 +545,8 @@ const server = http.createServer(async (req, res) => {
     return ok(res, { id: item.id, status: item.status })
   }
 
-  // poi 表 category 是英文枚举；首页 hotPois 用中文展示，出接口时映射成后端真实值
-  const poiCategoryEnum = { 人文古迹: 'landmark', 自然风光: 'attraction' }
-  const toPoiRecord = (p) => ({ ...p, category: poiCategoryEnum[p.category] || 'other', status: 1 })
-
   if (path === '/api/v1/poi' && method === 'GET') {
-    const category = url.searchParams.get('category')
-    const rows = homeData.hotPois.map(toPoiRecord)
-    return ok(res, category ? rows.filter((p) => p.category === category) : rows)
-  }
-
-  // 景点详情：字段与真实后端 poi 表一致，id 非法 400 / 不存在 404
-  const poiDetailMatch = path.match(/^\/api\/v1\/poi\/([^/]+)$/)
-  if (poiDetailMatch && method === 'GET') {
-    const raw = decodeURIComponent(poiDetailMatch[1])
-    if (!/^\d+$/.test(raw)) return fail(res, 400, 40001, '景点 id 非法')
-    const poi = homeData.hotPois.find((p) => p.id === Number(raw))
-    if (!poi) return fail(res, 404, 40401, '景点不存在')
-    return ok(res, toPoiRecord(poi))
+    return ok(res, homeData.hotPois.map((p) => ({ ...p, status: 'online' })))
   }
 
   fail(res, 404, 40401, `mock 未实现该接口：${method} ${path}`)
