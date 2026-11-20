@@ -1,6 +1,7 @@
 package com.example.scenicguide.ui.login
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +38,7 @@ import com.example.scenicguide.ui.rememberAppContainer
 @Composable
 fun LoginScreen(
     onLoggedIn: () -> Unit,
+    onGoRegister: () -> Unit,
 ) {
     val container = rememberAppContainer()
     val viewModel: LoginViewModel = viewModel(
@@ -130,6 +132,16 @@ fun LoginScreen(
                         Text("登录")
                     }
                 }
+
+                Text(
+                    text = "没有账号？去注册",
+                    color = Color(0xFF0E7C66),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .clickable { onGoRegister() },
+                )
             }
         }
 

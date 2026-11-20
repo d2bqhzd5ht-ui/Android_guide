@@ -30,6 +30,7 @@ import com.example.scenicguide.core.di.AppContainer
 import com.example.scenicguide.ui.chat.ChatScreen
 import com.example.scenicguide.ui.home.HomeScreen
 import com.example.scenicguide.ui.login.LoginScreen
+import com.example.scenicguide.ui.login.RegisterScreen
 import com.example.scenicguide.ui.lostfound.LostFoundDetailScreen
 import com.example.scenicguide.ui.lostfound.LostFoundListScreen
 import com.example.scenicguide.ui.lostfound.LostFoundPublishScreen
@@ -39,6 +40,7 @@ import com.example.scenicguide.ui.profile.ProfileScreen
 
 object Routes {
     const val LOGIN = "login"
+    const val REGISTER = "register"
     const val HOME = "home"
     const val CHAT = "chat"
     const val PROFILE = "profile"
@@ -111,6 +113,16 @@ fun AppRoot() {
                                 popUpTo(navController.graph.id) { inclusive = true }
                             }
                         },
+                        onGoRegister = { navController.navigate(Routes.REGISTER) },
+                    )
+                }
+                composable(Routes.REGISTER) {
+                    RegisterScreen(
+                        onRegistered = {
+                            // 注册成功 → 回登录页，用户手动输入新账号登录
+                            navController.popBackStack()
+                        },
+                        onBackToLogin = { navController.popBackStack() },
                     )
                 }
                 composable(Routes.HOME) {
