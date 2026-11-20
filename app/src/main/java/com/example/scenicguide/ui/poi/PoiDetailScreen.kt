@@ -26,13 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.scenicguide.data.model.PoiCategory
 import com.example.scenicguide.data.model.PoiDetail
 import com.example.scenicguide.data.model.categoryDisplayName
@@ -111,7 +112,7 @@ private fun PoiDetailContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        // 顶部渐变 Hero 区（后端暂未提供图片）
+        // 顶部 Hero 区：有 image_url 则全幅加载，否则 fallback 到类别渐变色
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -119,8 +120,15 @@ private fun PoiDetailContent(
                 .background(detailBrushFor(poi.category)),
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // 大字占位首字母
+            val url = poi.imageUrl?.takeIf { it.isNotBlank() }
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = poi.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
                 Text(
                     text = poi.name.take(1).ifBlank { "·" },
                     color = Color.White.copy(alpha = 0.6f),

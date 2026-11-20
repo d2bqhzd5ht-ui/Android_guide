@@ -34,11 +34,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.scenicguide.data.model.PoiCategory
 import com.example.scenicguide.data.model.PoiListItem
 import com.example.scenicguide.data.model.categoryDisplayName
@@ -208,7 +210,7 @@ private fun PoiCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Row(modifier = Modifier.padding(16.dp)) {
-            // 左侧渐变色块占位（后端暂未提供图片字段）
+            // 左侧缩略图：有 image_url 则加载，否则 fallback 到类别渐变色块
             Box(
                 modifier = Modifier
                     .width(80.dp)
@@ -217,12 +219,22 @@ private fun PoiCard(
                     .background(brushFor(poi.category)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = poi.name.take(1).ifBlank { "·" },
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
+                val url = poi.imageUrl?.takeIf { it.isNotBlank() }
+                if (url != null) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = poi.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Text(
+                        text = poi.name.take(1).ifBlank { "·" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
 
             Spacer(Modifier.width(12.dp))
