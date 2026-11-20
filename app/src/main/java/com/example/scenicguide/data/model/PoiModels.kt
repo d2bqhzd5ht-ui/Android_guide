@@ -17,8 +17,8 @@ enum class PoiCategory(val displayName: String) {
 }
 
 /**
- * 后端 GET /api/v1/poi 返回的列表项（精简字段）：
- * SELECT id, name, category, description, location, status FROM poi
+ * 后端 GET /api/v1/poi 返回的列表项（精简字段）。
+ * image_url 由 mock 后端 D 补入（picsum.photos 占位），真实后端 poi 表也应有此字段。
  */
 @Serializable
 data class PoiListItem(
@@ -28,10 +28,13 @@ data class PoiListItem(
     val description: String? = null,
     val location: String? = null,
     val status: Int = 1,
+    @SerialName("image_url")
+    val imageUrl: String? = null,
 )
 
 /**
- * 后端 GET /api/v1/poi/{id} 返回的完整记录（SELECT *）
+ * 后端 GET /api/v1/poi/{id} 返回的完整记录（SELECT *）。
+ * image_url 来自 poi 表新增字段。
  */
 @Serializable
 data class PoiDetail(
@@ -43,6 +46,8 @@ data class PoiDetail(
     val longitude: Double? = null,
     val latitude: Double? = null,
     val status: Int = 1,
+    @SerialName("image_url")
+    val imageUrl: String? = null,
     @SerialName("created_at")
     val createdAt: String? = null,
 )

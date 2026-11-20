@@ -81,9 +81,36 @@ const homeData = {
     { icon: 'goods-o', label: '失物招领', path: '/lost-found', color: '#7232dd' },
   ],
   hotPois: [
-    { id: 1, name: '灵隐寺', category: '人文古迹', description: '始建于东晋，江南著名古刹。' },
-    { id: 2, name: '九溪十八涧', category: '自然风光', description: '溪流蜿蜒，适合徒步。' },
-    { id: 3, name: '雷峰塔', category: '人文古迹', description: '夕照雷峰，西湖十景之一。' },
+    {
+      id: 1,
+      name: '灵隐寺',
+      category: '人文古迹',
+      description: '始建于东晋，江南著名古刹。',
+      location: '西湖区法云弄1号',
+      longitude: 120.101,
+      latitude: 30.241,
+      image_url: 'https://picsum.photos/seed/lingyinsi/800/600',
+    },
+    {
+      id: 2,
+      name: '九溪十八涧',
+      category: '自然风光',
+      description: '溪流蜿蜒，适合徒步。',
+      location: '西湖区龙井村南九溪',
+      longitude: 120.118,
+      latitude: 30.196,
+      image_url: 'https://picsum.photos/seed/jiuxi/800/600',
+    },
+    {
+      id: 3,
+      name: '雷峰塔',
+      category: '人文古迹',
+      description: '夕照雷峰，西湖十景之一。',
+      location: '西湖区南山路15号',
+      longitude: 120.148,
+      latitude: 30.231,
+      image_url: 'https://picsum.photos/seed/leifengta/800/600',
+    },
   ],
   recommendedRoutes: [
     { id: 1, name: '西湖经典一日游', theme: '人文古迹', description: '断桥 → 白堤 → 孤山 → 岳庙', estimated_minutes: 360 },
@@ -333,17 +360,24 @@ const server = http.createServer(async (req, res) => {
     return ok(res, item)
   }
 
+  // poi 表 category 是英文枚举；首页 hotPois 用中文展示，出接口时映射成后端真实值
+  const poiCategoryEnum = { 人文古迹: 'landmark', 自然风光: 'attraction' }
+  const toPoiRecord = (p) => ({ ...p, category: poiCategoryEnum[p.category] || 'other', status: 1 })
+
   if (path === '/api/v1/poi' && method === 'GET') {
     const category = url.searchParams.get('category')
-    const list = category ? poiList.filter((p) => p.category === category) : poiList
-    return ok(res, list.map(({ id, name, category: c, description, location, status }) => ({ id, name, category: c, description, location, status })))
+    const rows = homeData.hotPois.map(toPoiRecord)
+    return ok(res, category ? rows.filter((p) => p.category === category) : rows)
   }
 
-  const poiDetail = path.match(/^\/api\/v1\/poi\/(\d+)$/)
-  if (poiDetail && method === 'GET') {
-    const poi = poiList.find((p) => p.id === Number(poiDetail[1]))
+  // 景点详情：字段与真实后端 poi 表一致，id 非法 400 / 不存在 404
+  const poiDetailMatch = path.match(/^\/api\/v1\/poi\/([^/]+)$/)
+  if (poiDetailMatch && method === 'GET') {
+    const raw = decodeURIComponent(poiDetailMatch[1])
+    if (!/^\d+$/.test(raw)) return fail(res, 400, 40001, '景点 id 非法')
+    const poi = homeData.hotPois.find((p) => p.id === Number(raw))
     if (!poi) return fail(res, 404, 40401, '景点不存在')
-    return ok(res, poi)
+    return ok(res, toPoiRecord(poi))
   }
 
   fail(res, 404, 40401, `mock 未实现该接口：${method} ${path}`)
