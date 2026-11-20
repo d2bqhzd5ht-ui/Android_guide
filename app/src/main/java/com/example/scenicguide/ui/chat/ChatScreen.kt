@@ -45,7 +45,15 @@ import com.example.scenicguide.voice.VoiceInputButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(onBack: () -> Unit) {
+fun ChatScreen(
+    onBack: () -> Unit,
+    /**
+     * 语音入口插槽（A 的 VoiceInputButton 从这里进来）：
+     * `voiceInput = { onText -> VoiceInputButton(voiceClient, onRecognized = onText, ...) }`
+     * 识别出的文字只会回填到输入框，不自动发送。传 null 时使用内置的 VoiceInputButton。
+     */
+    voiceInput: (@Composable (onRecognized: (String) -> Unit) -> Unit)? = null,
+) {
     val container = rememberAppContainer()
     val viewModel: ChatViewModel = viewModel(
         factory = ChatViewModel.factory(container.chatRepository),
@@ -131,15 +139,21 @@ fun ChatScreen(onBack: () -> Unit) {
                         placeholder = { Text("问问景区的事…") },
                         maxLines = 4,
                         trailingIcon = {
-                            VoiceInputButton(
-                                voiceClient = container.voiceClient,
-                                enabled = !state.streaming,
-                                onRecognized = { text ->
-                                    voiceError = null
-                                    viewModel.send(text)
-                                },
-                                onError = { voiceError = it },
-                            )
+                            // 识别结果只回填输入框，由用户确认后再发送
+                            val onRecognized: (String) -> Unit = { text ->
+                                voiceError = null
+                                viewModel.onInputChange(text)
+                            }
+                            if (voiceInput != null) {
+                                voiceInput(onRecognized)
+                            } else {
+                                VoiceInputButton(
+                                    voiceClient = container.voiceClient,
+                                    enabled = !state.streaming,
+                                    onRecognized = onRecognized,
+                                    onError = { voiceError = it },
+                                )
+                            }
                         },
                     )
                     if (state.streaming) {
