@@ -1,6 +1,12 @@
 package com.example.scenicguide.ui.poi
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -29,8 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.getSystemService
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -209,6 +220,11 @@ private fun PoiDetailContent(
             // 信息卡片
             InfoCard(poi = poi)
 
+            Spacer(Modifier.height(16.dp))
+
+            // 操作按钮行：导航 + 复制位置
+            ActionRow(poi = poi)
+
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -289,5 +305,72 @@ private fun InfoRow(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 操作按钮：导航 + 复制位置
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ActionRow(poi: PoiDetail) {
+    val context = LocalContext.current
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // 主按钮：导航（有坐标传坐标，没有则用位置文字搜索）
+        Button(
+            onClick = { openNavigation(context, poi) },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+            ),
+        ) {
+            Text("🧭 导航")
+        }
+
+        // 次按钮：复制位置
+        OutlinedButton(
+            onClick = { copyLocation(context, poi) },
+            modifier = Modifier.weight(1f),
+        ) {
+            Text("📋 复制位置")
+        }
+    }
+}
+
+/**
+ * 打开地图应用导航：
+ *  - 有经纬度 → geo:lat,lon?q=名称（Google Maps / 高德都支持）
+ *  - 没坐标但有位置文字 → geo:0,0?q=位置文字（跳搜索框）
+ *  - 都没有 → Toast 提示
+ */
+private fun openNavigation(context: Context, poi: PoiDetail) {
+    val query = poi.location?.takeIf { it.isNotBlank() } ?: poi.name
+    val geoUri = if (poi.longitude != null && poi.latitude != null) {
+        "geo:${poi.latitude},${poi.longitude}?q=${java.net.URLEncoder.encode(query, "UTF-8")}"
+    } else {
+        "geo:0,0?q=${java.net.URLEncoder.encode(query, "UTF-8")}"
+    }
+    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(geoUri)).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    if (intent.resolveActivity(context.packageManager) != null) {
+        context.startActivity(intent)
+    } else {
+        Toast.makeText(context, "未检测到地图应用，请先安装高德/百度/Google Maps", Toast.LENGTH_LONG).show()
+    }
+}
+
+/** 复制位置文字到剪贴板 */
+private fun copyLocation(context: Context, poi: PoiDetail) {
+    val text = poi.location?.takeIf { it.isNotBlank() }
+        ?: "（位置信息暂缺）"
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    if (clipboard != null) {
+        clipboard.setPrimaryClip(ClipData.newPlainText("景点位置", text))
+        Toast.makeText(context, "已复制位置：$text", Toast.LENGTH_SHORT).show()
     }
 }
