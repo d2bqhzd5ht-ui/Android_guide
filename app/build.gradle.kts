@@ -15,9 +15,11 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        // 默认走 adb reverse：先执行 adb reverse tcp:8000 tcp:8000，模拟器和真机都通用。
-        // 后端在别的机器上时用命令行覆盖：./gradlew assembleDebug -Pscenic.baseUrl=http://192.168.1.10:8000/
-        val baseUrl = (findProperty("scenic.baseUrl") as String?) ?: "http://127.0.0.1:8000/"
+        // 默认模拟器直连宿主机后端；真机 / adb reverse 分别覆盖：
+        //   模拟器：http://10.0.2.2:8000/
+        //   真机 ：./gradlew assembleDebug -Pscenic.baseUrl=http://192.168.1.103:8000/
+        //   adb reverse 场景：adb reverse tcp:8000 tcp:8000 + http://127.0.0.1:8000/
+        val baseUrl = (findProperty("scenic.baseUrl") as String?) ?: "http://10.0.2.2:8000/"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
     }
 
