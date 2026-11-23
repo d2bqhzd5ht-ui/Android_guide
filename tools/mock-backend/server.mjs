@@ -120,13 +120,6 @@ const homeData = {
   stats: { totalInteractions: 0, todayInteractions: 0, positiveRate: 0 },
 }
 
-// 景点数据：字段与真实后端一致（status 为 1/0 整数，category 为中文展示名）
-const poiList = [
-  { id: 1, name: '灵隐寺', category: '人文古迹', description: '始建于东晋，江南著名古刹。', location: '西湖区法云弄1号', longitude: 120.101, latitude: 30.241, status: 1, created_at: '2026-01-01 09:00:00' },
-  { id: 2, name: '九溪十八涧', category: '自然风光', description: '溪流蜿蜒，适合徒步。', location: '西湖区九溪路', longitude: 120.117, latitude: 30.196, status: 1, created_at: '2026-01-01 09:00:00' },
-  { id: 3, name: '雷峰塔', category: '人文古迹', description: '夕照雷峰，西湖十景之一。', location: '西湖区南山路15号', longitude: 120.149, latitude: 30.231, status: 1, created_at: '2026-01-01 09:00:00' },
-]
-
 const streamingSessions = new Map() // sessionId -> { aborted }
 
 // 失物招领内存数据（与真实后端字段一致：type / title / category / description /
@@ -314,7 +307,11 @@ const server = http.createServer(async (req, res) => {
     })
 
     const start = (page - 1) * size
-    return ok(res, { list: rows.slice(start, start + size), total: rows.length, page, size })
+    const total = rows.length
+    return ok(res, {
+      list: rows.slice(start, start + size),
+      pagination: { page, size, total, totalPages: Math.ceil(total / size) },
+    })
   }
 
   if (path === '/api/v1/lost-found' && method === 'POST') {
@@ -328,7 +325,7 @@ const server = http.createServer(async (req, res) => {
     const item = addLostFoundType({
       type: body.type,
       title: body.title,
-      category: body.category || null,
+      category: body.category || 'other',
       description: body.description || null,
       location: body.location || null,
       image_url: body.image_url || null,
@@ -346,6 +343,30 @@ const server = http.createServer(async (req, res) => {
     if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
     return ok(res, item)
   }
+  if (lostFoundDetailMatch && method === 'PUT') {
+    const body = await readBody(req)
+    const item = lostFound.find((row) => row.id === Number(lostFoundDetailMatch[1]))
+    if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
+    if (body.type !== undefined && !['lost', 'found'].includes(body.type)) {
+      return fail(res, 400, 40001, 'type 只能是 lost 或 found')
+    }
+    // 真实后端：允许只传部分字段，但至少要有一个合法字段
+    const allowed = ['type', 'title', 'category', 'description', 'location', 'contact', 'publisher_name']
+    const patch = {}
+    for (const key of allowed) if (body[key] !== undefined) patch[key] = body[key]
+    if (Object.keys(patch).length === 0) {
+      return fail(res, 400, 40001, '至少需要一个可更新字段')
+    }
+    Object.assign(item, patch, { updated_at: new Date().toISOString() })
+    return ok(res, item)
+  }
+  if (lostFoundDetailMatch && method === 'DELETE') {
+    const id = Number(lostFoundDetailMatch[1])
+    const idx = lostFound.findIndex((row) => row.id === id)
+    if (idx === -1) return fail(res, 404, 40401, '失物招领记录不存在')
+    lostFound.splice(idx, 1)
+    return ok(res, { id })
+  }
 
   const lostFoundStatusMatch = path.match(/^\/api\/v1\/lost-found\/(\d+)\/status$/)
   if (lostFoundStatusMatch && method === 'PATCH') {
@@ -357,7 +378,8 @@ const server = http.createServer(async (req, res) => {
     if (!item) return fail(res, 404, 40401, '失物招领记录不存在')
     item.status = body.status
     item.updated_at = new Date().toISOString()
-    return ok(res, item)
+    // 真实后端 PATCH /status 只返回 { id, status }
+    return ok(res, { id: item.id, status: item.status })
   }
 
   // poi 表 category 是英文枚举；首页 hotPois 用中文展示，出接口时映射成后端真实值
