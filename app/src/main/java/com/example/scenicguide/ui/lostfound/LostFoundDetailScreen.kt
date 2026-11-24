@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -23,8 +24,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +47,8 @@ import com.example.scenicguide.ui.rememberAppContainer
 fun LostFoundDetailScreen(
     itemId: Int,
     onBack: () -> Unit,
+    onEdit: (Int) -> Unit,
+    onDeleted: () -> Unit,
 ) {
     val container = rememberAppContainer()
     val viewModel: LostFoundDetailViewModel = viewModel(
@@ -69,9 +76,13 @@ fun LostFoundDetailScreen(
                 modifier = Modifier.padding(padding),
             )
 
+            is LostFoundDetailViewModel.UiState.Deleted -> { /* 被删除后外部导航回去 */ }
+
             is LostFoundDetailViewModel.UiState.Success -> DetailContent(
                 state = current,
                 onUpdateStatus = viewModel::updateStatus,
+                onEdit = { onEdit(itemId) },
+                onDelete = { viewModel.delete(onDeleted) },
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
@@ -86,9 +97,12 @@ fun LostFoundDetailScreen(
 private fun DetailContent(
     state: LostFoundDetailViewModel.UiState.Success,
     onUpdateStatus: (String) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val item = state.item
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -127,7 +141,7 @@ private fun DetailContent(
                 )
                 .padding(horizontal = 16.dp, vertical = 4.dp),
         ) {
-            InfoRow("分类", item.category)
+            InfoRow("分类", item.category.takeIf { it != LostFoundItem.CATEGORY_OTHER })
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             InfoRow("地点", item.location)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -161,6 +175,12 @@ private fun DetailContent(
             )
         }
 
+        Button(
+            onClick = onEdit,
+            enabled = !state.updating,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) { Text("编辑") }
+
         if (item.status != LostFoundItem.STATUS_RESOLVED) {
             StatusButton(
                 text = "标记为已解决",
@@ -183,17 +203,41 @@ private fun DetailContent(
             )
         }
 
+        OutlinedButton(
+            onClick = { showDeleteConfirm = true },
+            enabled = !state.updating,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) {
+            Text("删除", color = MaterialTheme.colorScheme.error)
+        }
+
         if (state.updating) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                 Text(
-                    text = "正在更新状态…",
+                    text = "正在处理…",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("确认删除") },
+            text = { Text("删除后无法恢复，确定要删除这条失物招领信息吗？") },
+            confirmButton = {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete() }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            },
+        )
     }
 }
 
