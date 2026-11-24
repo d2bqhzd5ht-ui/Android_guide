@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -118,114 +119,127 @@ private fun PoiDetailContent(
     poi: PoiDetail,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
-        // 顶部 Hero 区：图片 + 深色渐变蒙层 + 景点名/类别叠在上面
-        Box(
+    // 底部按钮固定，内容区域单独滚动
+    Box(modifier = modifier.fillMaxSize()) {
+        // 滚动内容区
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .background(detailBrushFor(poi.category)),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 88.dp), // 给底部固定按钮留空间
         ) {
-            // 底层：图片 或 首字母大字
-            val url = poi.imageUrl?.takeIf { it.isNotBlank() }
-            if (url != null) {
-                AsyncImage(
-                    model = url,
-                    contentDescription = poi.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
+            // 顶部 Hero 区：图片 + 深色渐变蒙层 + 景点名/类别叠在上面
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp)
+                    .background(detailBrushFor(poi.category)),
+            ) {
+                // 底层：图片 或 首字母大字
+                val url = poi.imageUrl?.takeIf { it.isNotBlank() }
+                if (url != null) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = poi.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = poi.name.take(1).ifBlank { "·" },
+                            color = Color.White.copy(alpha = 0.5f),
+                            style = MaterialTheme.typography.displayLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+
+                // 深色渐变蒙层（底部向上），保证叠在上层文字可读
                 Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.15f),
+                                    Color.Black.copy(alpha = 0.55f),
+                                ),
+                                startY = 0f,
+                                endY = Float.POSITIVE_INFINITY,
+                            ),
+                        ),
+                )
+
+                // 叠在上面的景点名 + 类别
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 20.dp, end = 16.dp, bottom = 16.dp),
                 ) {
+                    Card(
+                        shape = RoundedCornerShape(999.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.White.copy(alpha = 0.25f),
+                        ),
+                    ) {
+                        Text(
+                            text = poi.category.categoryDisplayName(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                     Text(
-                        text = poi.name.take(1).ifBlank { "·" },
-                        color = Color.White.copy(alpha = 0.5f),
-                        style = MaterialTheme.typography.displayLarge,
+                        text = poi.name,
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 }
             }
 
-            // 深色渐变蒙层（底部向上），保证叠在上层文字可读
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.15f),
-                                Color.Black.copy(alpha = 0.55f),
-                            ),
-                            startY = 0f,
-                            endY = Float.POSITIVE_INFINITY,
-                        ),
-                    ),
-            )
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Spacer(Modifier.height(8.dp))
 
-            // 叠在上面的景点名 + 类别
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 20.dp, end = 16.dp, bottom = 16.dp),
-            ) {
-                Card(
-                    shape = RoundedCornerShape(999.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White.copy(alpha = 0.25f),
-                    ),
-                ) {
+                // 描述
+                poi.description?.takeIf { it.isNotBlank() }?.let {
+                    SectionTitle("景点介绍")
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        text = poi.category.categoryDisplayName(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                        fontWeight = FontWeight.SemiBold,
+                        text = it,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                Text(
-                    text = poi.name,
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+
+                Spacer(Modifier.height(20.dp))
+
+                // 信息卡片
+                InfoCard(poi = poi)
+
+                Spacer(Modifier.height(24.dp))
             }
         }
 
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Spacer(Modifier.height(8.dp))
-
-            // 描述
-            poi.description?.takeIf { it.isNotBlank() }?.let {
-                SectionTitle("景点介绍")
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        // 底部固定按钮栏
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+            shadowElevation = 8.dp,
+            tonalElevation = 4.dp,
+        ) {
+            Box(modifier = Modifier.padding(16.dp)) {
+                ActionRow(poi = poi)
             }
-
-            Spacer(Modifier.height(20.dp))
-
-            // 信息卡片
-            InfoCard(poi = poi)
-
-            Spacer(Modifier.height(16.dp))
-
-            // 操作按钮行：导航 + 复制位置
-            ActionRow(poi = poi)
-
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -341,49 +355,72 @@ private fun ActionRow(poi: PoiDetail) {
     }
 }
 
+/** 高德地图包名 */
+private const val AMAP_PACKAGE = "com.autonavi.minimap"
+
 /**
- * 打开导航：三级降级，保证「能导航」而不是「只能 Toast」
+ * 打开导航：逐级降级，保证「能导航」而不是「只能 Toast」
  *
- *  1. 原生地图 App：geo:lat,lon?q=名称
- *     Google Maps、高德、百度都支持此 URI scheme
- *  2. 降级：浏览器打开高德网页版 https://uri.amap.com/navigation
- *     有坐标走 to=lng,lat|name；无坐标走 keyword=搜索词
- *  3. 兜底：Toast（理论上不会走到，Android 必有浏览器）
+ *  1. 高德原生导航：androidamap://navi + setPackage(高德)
+ *  2. geo: URI（Google Maps / 百度 / 系统地图）
+ *  3. https://uri.amap.com/navigation（浏览器网页版）
+ *  4. 兜底 Toast
+ *
+ * 注意：不能用 resolveActivity() 预判，Android 11+ 的包可见性会让它
+ * 对未在 <queries> 声明的应用返回 null，导致明明装了高德却直接降级到浏览器。
+ * 这里改为直接 startActivity 并捕获 ActivityNotFoundException。
  */
 private fun openNavigation(context: Context, poi: PoiDetail) {
     val query = poi.location?.takeIf { it.isNotBlank() } ?: poi.name
     val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+    val hasCoord = poi.longitude != null && poi.latitude != null
 
-    // --- Level 1: 原生地图 App (geo: scheme) ---
-    val geoUri = if (poi.longitude != null && poi.latitude != null) {
+    // --- Level 1: 高德原生导航（显式指定包名）---
+    val amapUri = if (hasCoord) {
+        val name = java.net.URLEncoder.encode(poi.name, "UTF-8")
+        "androidamap://navi?sourceApplication=scenicguide" +
+            "&lat=${poi.latitude}&lon=${poi.longitude}&dev=0&style=2&poiname=$name"
+    } else {
+        "androidamap://poi?sourceApplication=scenicguide&keywords=$encodedQuery"
+    }
+    if (tryStartMapIntent(context, amapUri, AMAP_PACKAGE)) return
+
+    // --- Level 2: geo: URI ---
+    val geoUri = if (hasCoord) {
         "geo:${poi.latitude},${poi.longitude}?q=$encodedQuery"
     } else {
         "geo:0,0?q=$encodedQuery"
     }
-    val geoIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(geoUri)).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    if (geoIntent.resolveActivity(context.packageManager) != null) {
-        context.startActivity(geoIntent)
-        return
-    }
+    if (tryStartMapIntent(context, geoUri, null)) return
 
-    // --- Level 2: 降级到浏览器 + 高德网页版 ---
-    val webUri = buildAmapWebUri(poi, query)
-    val webIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(webUri)).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    if (webIntent.resolveActivity(context.packageManager) != null) {
-        context.startActivity(webIntent)
-        return
-    }
+    // --- Level 3: 浏览器打开高德网页版 ---
+    if (tryStartMapIntent(context, buildAmapWebUri(poi, query), null)) return
 
-    // --- Level 3: 兜底 Toast ---
+    // --- Level 4: 兜底 Toast ---
     Toast.makeText(
         context,
         "未检测到地图应用或浏览器，请先安装后重试",
         Toast.LENGTH_LONG,
     ).show()
+}
+
+/**
+ * 尝试打开 URI；成功返回 true。
+ * [pkg] 不为空时显式限定目标应用，避免被默认浏览器抢走。
+ */
+private fun tryStartMapIntent(context: Context, uri: String, pkg: String?): Boolean {
+    return try {
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (pkg != null) setPackage(pkg)
+        }
+        context.startActivity(intent)
+        true
+    } catch (e: android.content.ActivityNotFoundException) {
+        false
+    } catch (e: SecurityException) {
+        false
+    }
 }
 
 /**
