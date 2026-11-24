@@ -342,25 +342,67 @@ private fun ActionRow(poi: PoiDetail) {
 }
 
 /**
- * 打开地图应用导航：
- *  - 有经纬度 → geo:lat,lon?q=名称（Google Maps / 高德都支持）
- *  - 没坐标但有位置文字 → geo:0,0?q=位置文字（跳搜索框）
- *  - 都没有 → Toast 提示
+ * 打开导航：三级降级，保证「能导航」而不是「只能 Toast」
+ *
+ *  1. 原生地图 App：geo:lat,lon?q=名称
+ *     Google Maps、高德、百度都支持此 URI scheme
+ *  2. 降级：浏览器打开高德网页版 https://uri.amap.com/navigation
+ *     有坐标走 to=lng,lat|name；无坐标走 keyword=搜索词
+ *  3. 兜底：Toast（理论上不会走到，Android 必有浏览器）
  */
 private fun openNavigation(context: Context, poi: PoiDetail) {
     val query = poi.location?.takeIf { it.isNotBlank() } ?: poi.name
+    val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+
+    // --- Level 1: 原生地图 App (geo: scheme) ---
     val geoUri = if (poi.longitude != null && poi.latitude != null) {
-        "geo:${poi.latitude},${poi.longitude}?q=${java.net.URLEncoder.encode(query, "UTF-8")}"
+        "geo:${poi.latitude},${poi.longitude}?q=$encodedQuery"
     } else {
-        "geo:0,0?q=${java.net.URLEncoder.encode(query, "UTF-8")}"
+        "geo:0,0?q=$encodedQuery"
     }
-    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(geoUri)).apply {
+    val geoIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(geoUri)).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    if (intent.resolveActivity(context.packageManager) != null) {
-        context.startActivity(intent)
+    if (geoIntent.resolveActivity(context.packageManager) != null) {
+        context.startActivity(geoIntent)
+        return
+    }
+
+    // --- Level 2: 降级到浏览器 + 高德网页版 ---
+    val webUri = buildAmapWebUri(poi, query)
+    val webIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(webUri)).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    if (webIntent.resolveActivity(context.packageManager) != null) {
+        context.startActivity(webIntent)
+        return
+    }
+
+    // --- Level 3: 兜底 Toast ---
+    Toast.makeText(
+        context,
+        "未检测到地图应用或浏览器，请先安装后重试",
+        Toast.LENGTH_LONG,
+    ).show()
+}
+
+/**
+ * 构造高德网页版导航 URI：
+ *  - 有坐标：https://uri.amap.com/navigation?to=lng,lat|name&mode=car&policy=1
+ *  - 无坐标：https://uri.amap.com/search?keyword=搜索词
+ *
+ * 高德 uri.amap.com 网页版是中国区最稳的降级方案，
+ * 免登录、免 App 安装，微信/系统浏览器都能直接打开。
+ */
+private fun buildAmapWebUri(poi: PoiDetail, query: String): String {
+    val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+    return if (poi.longitude != null && poi.latitude != null) {
+        // 有坐标 → 直接起导航
+        val name = java.net.URLEncoder.encode(poi.name, "UTF-8")
+        "https://uri.amap.com/navigation?to=${poi.longitude},${poi.latitude}|$name&mode=car&policy=1"
     } else {
-        Toast.makeText(context, "未检测到地图应用，请先安装高德/百度/Google Maps", Toast.LENGTH_LONG).show()
+        // 无坐标 → 搜索页
+        "https://uri.amap.com/search?keyword=$encodedQuery"
     }
 }
 
