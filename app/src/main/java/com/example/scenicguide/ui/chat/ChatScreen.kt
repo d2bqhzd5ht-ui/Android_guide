@@ -1,5 +1,6 @@
 package com.example.scenicguide.ui.chat
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,23 +9,21 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -34,16 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.scenicguide.ui.components.GuideTopBar
 import com.example.scenicguide.ui.rememberAppContainer
 import com.example.scenicguide.voice.TtsPlayerState
 import com.example.scenicguide.voice.VoiceInputButton
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(onBack: () -> Unit) {
     val container = rememberAppContainer()
@@ -72,35 +69,26 @@ fun ChatScreen(onBack: () -> Unit) {
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("AI 问答", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            text = when {
-                                speaking && ttsState is TtsPlayerState.Synthesizing -> "正在合成语音…"
-                                speaking -> "正在播报语音"
-                                state.streaming -> "正在流式回答…"
-                                else -> "景区知识随时问"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            GuideTopBar(
+                title = "AI 问答",
+                subtitle = when {
+                    speaking && ttsState is TtsPlayerState.Synthesizing -> "正在合成语音…"
+                    speaking -> "正在播报语音"
+                    state.streaming -> "正在流式回答…"
+                    else -> "景区知识随时问"
                 },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("‹ 返回") }
-                },
+                onBack = onBack,
             )
         },
         bottomBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.background)
                     .imePadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 (voiceError ?: state.error)?.let { message ->
                     Row(
@@ -128,7 +116,14 @@ fun ChatScreen(onBack: () -> Unit) {
                         value = state.input,
                         onValueChange = viewModel::onInputChange,
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("问问景区的事…") },
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        shape = MaterialTheme.shapes.medium,
+                        placeholder = {
+                            Text(
+                                text = "问问景区的事…",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
                         maxLines = 4,
                         trailingIcon = {
                             VoiceInputButton(
@@ -145,14 +140,20 @@ fun ChatScreen(onBack: () -> Unit) {
                     if (state.streaming) {
                         Button(
                             onClick = viewModel::stop,
-                            modifier = Modifier.padding(start = 8.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .height(48.dp),
                         ) {
                             Text("停止")
                         }
                     } else {
                         Button(
                             onClick = { viewModel.send() },
-                            modifier = Modifier.padding(start = 8.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .height(48.dp),
                         ) {
                             Text("发送")
                         }
@@ -176,8 +177,8 @@ fun ChatScreen(onBack: () -> Unit) {
                 ) {
                     Text(
                         text = "试试这样问",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
                         text = "“这个景区有什么典故？”\n“带孩子逛一天怎么安排路线？”",
@@ -191,8 +192,8 @@ fun ChatScreen(onBack: () -> Unit) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(state.messages) { message ->
                         ChatBubble(
@@ -229,13 +230,12 @@ private fun ChatBubble(
             horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         ) {
             Surface(
-                shape = RoundedCornerShape(
-                    topStart = 14.dp,
-                    topEnd = 14.dp,
-                    bottomStart = if (isUser) 14.dp else 4.dp,
-                    bottomEnd = if (isUser) 4.dp else 14.dp,
-                ),
-                color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.medium,
+                color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                contentColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                border = if (isUser) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                shadowElevation = 0.dp,
+                tonalElevation = 0.dp,
                 modifier = Modifier.fillMaxWidth(0.85f),
             ) {
                 Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
@@ -259,7 +259,7 @@ private fun ChatBubble(
                         else -> Text(
                             text = if (message.streaming) message.content + "▌" else message.content,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }

@@ -3,10 +3,21 @@ package com.example.scenicguide.ui
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,12 +28,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.scenicguide.ScenicGuideApplication
@@ -56,6 +70,14 @@ object Routes {
     fun lostFoundEdit(itemId: Int) = "lost_found/$itemId/edit"
     fun poiDetail(poiId: Int) = "poi/$poiId"
 }
+
+private data class GuideTab(
+    val route: String?,
+    val label: String,
+    val icon: ImageVector,
+)
+
+private val topLevelRoutes = setOf(Routes.HOME, Routes.CHAT, Routes.POI_LIST, Routes.PROFILE)
 
 @Composable
 fun rememberAppContainer(): AppContainer {
@@ -92,120 +114,182 @@ fun AppRoot() {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val showBottomBar = !imeVisible && currentRoute != null && currentRoute in topLevelRoutes
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
         if (!sessionReady) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator()
                     Text(
-                        text = "景区 AI 导览",
+                        text = "西湖导览",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = 16.dp),
                     )
                 }
             }
         } else {
-            NavHost(
-                navController = navController,
-                startDestination = if (session != null) Routes.HOME else Routes.LOGIN,
-            ) {
-                composable(Routes.LOGIN) {
-                    LoginScreen(
-                        onLoggedIn = {
-                            navController.navigate(Routes.HOME) {
-                                popUpTo(navController.graph.id) { inclusive = true }
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.weight(1f)) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = if (session != null) Routes.HOME else Routes.LOGIN,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        composable(Routes.LOGIN) {
+                            LoginScreen(
+                                onLoggedIn = {
+                                    navController.navigate(Routes.HOME) {
+                                        popUpTo(navController.graph.id) { inclusive = true }
+                                    }
+                                },
+                                onGoRegister = { navController.navigate(Routes.REGISTER) },
+                            )
+                        }
+                        composable(Routes.REGISTER) {
+                            RegisterScreen(
+                                onRegistered = {
+                                    // 注册成功 → 回登录页，用户手动输入新账号登录
+                                    navController.popBackStack()
+                                },
+                                onBackToLogin = { navController.popBackStack() },
+                            )
+                        }
+                        composable(Routes.HOME) {
+                            HomeScreen(
+                                onOpenChat = { navController.navigate(Routes.CHAT) },
+                                onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                                onOpenLostFound = { navController.navigate(Routes.LOST_FOUND) },
+                                onOpenPoiList = { navController.navigate(Routes.POI_LIST) },
+                                onOpenPoiDetail = { poiId ->
+                                    navController.navigate(Routes.poiDetail(poiId))
+                                },
+                            )
+                        }
+                        composable(Routes.LOST_FOUND) {
+                            LostFoundListScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenDetail = { itemId ->
+                                    navController.navigate(Routes.lostFoundDetail(itemId))
+                                },
+                                onPublish = { navController.navigate(Routes.LOST_FOUND_PUBLISH) },
+                            )
+                        }
+                        composable(
+                            route = Routes.LOST_FOUND_DETAIL,
+                            arguments = listOf(navArgument("itemId") { type = NavType.IntType }),
+                        ) { entry ->
+                            val itemId = entry.arguments?.getInt("itemId") ?: 0
+                            LostFoundDetailScreen(
+                                itemId = itemId,
+                                onBack = { navController.popBackStack() },
+                                onEdit = { id -> navController.navigate(Routes.lostFoundEdit(id)) },
+                                onDeleted = { navController.popBackStack() },
+                            )
+                        }
+                        composable(
+                            route = Routes.LOST_FOUND_EDIT,
+                            arguments = listOf(navArgument("itemId") { type = NavType.IntType }),
+                        ) { entry ->
+                            val itemId = entry.arguments?.getInt("itemId") ?: 0
+                            LostFoundEditScreen(
+                                itemId = itemId,
+                                onBack = { navController.popBackStack() },
+                                onSaved = { navController.popBackStack() },
+                            )
+                        }
+                        composable(Routes.LOST_FOUND_PUBLISH) {
+                            LostFoundPublishScreen(
+                                onBack = { navController.popBackStack() },
+                                onPublished = { navController.popBackStack() },
+                            )
+                        }
+                        composable(Routes.CHAT) {
+                            ChatScreen(onBack = { navController.popBackStack() })
+                        }
+                        composable(Routes.PROFILE) {
+                            ProfileScreen(
+                                onBack = { navController.popBackStack() },
+                                onLoggedOut = {
+                                    navController.navigate(Routes.LOGIN) {
+                                        popUpTo(navController.graph.id) { inclusive = true }
+                                    }
+                                },
+                            )
+                        }
+                        composable(Routes.POI_LIST) {
+                            PoiListScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenDetail = { poiId ->
+                                    navController.navigate(Routes.poiDetail(poiId))
+                                },
+                            )
+                        }
+                        composable(
+                            route = Routes.POI_DETAIL,
+                            arguments = listOf(navArgument("poiId") { type = NavType.IntType }),
+                        ) { entry ->
+                            val poiId = entry.arguments?.getInt("poiId") ?: 0
+                            PoiDetailScreen(
+                                poiId = poiId,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+                    }
+                }
+                if (showBottomBar) {
+                    GuideBottomBar(
+                        currentRoute = currentRoute,
+                        onNavigate = { route ->
+                            if (route != currentRoute) {
+                                navController.navigate(route) {
+                                    popUpTo(Routes.HOME) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         },
-                        onGoRegister = { navController.navigate(Routes.REGISTER) },
-                    )
-                }
-                composable(Routes.REGISTER) {
-                    RegisterScreen(
-                        onRegistered = {
-                            // 注册成功 → 回登录页，用户手动输入新账号登录
-                            navController.popBackStack()
+                        onRoutesUnavailable = {
+                            Toast.makeText(context, "游玩攻略暂未开放", Toast.LENGTH_SHORT).show()
                         },
-                        onBackToLogin = { navController.popBackStack() },
-                    )
-                }
-                composable(Routes.HOME) {
-                    HomeScreen(
-                        onOpenChat = { navController.navigate(Routes.CHAT) },
-                        onOpenProfile = { navController.navigate(Routes.PROFILE) },
-                        onOpenLostFound = { navController.navigate(Routes.LOST_FOUND) },
-                        onOpenPoiList = { navController.navigate(Routes.POI_LIST) },
-                    )
-                }
-                composable(Routes.LOST_FOUND) {
-                    LostFoundListScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenDetail = { itemId ->
-                            navController.navigate(Routes.lostFoundDetail(itemId))
-                        },
-                        onPublish = { navController.navigate(Routes.LOST_FOUND_PUBLISH) },
-                    )
-                }
-                composable(
-                    route = Routes.LOST_FOUND_DETAIL,
-                    arguments = listOf(navArgument("itemId") { type = NavType.IntType }),
-                ) { entry ->
-                    val itemId = entry.arguments?.getInt("itemId") ?: 0
-                    LostFoundDetailScreen(
-                        itemId = itemId,
-                        onBack = { navController.popBackStack() },
-                        onEdit = { id -> navController.navigate(Routes.lostFoundEdit(id)) },
-                        onDeleted = { navController.popBackStack() },
-                    )
-                }
-                composable(
-                    route = Routes.LOST_FOUND_EDIT,
-                    arguments = listOf(navArgument("itemId") { type = NavType.IntType }),
-                ) { entry ->
-                    val itemId = entry.arguments?.getInt("itemId") ?: 0
-                    LostFoundEditScreen(
-                        itemId = itemId,
-                        onBack = { navController.popBackStack() },
-                        onSaved = { navController.popBackStack() },
-                    )
-                }
-                composable(Routes.LOST_FOUND_PUBLISH) {
-                    LostFoundPublishScreen(
-                        onBack = { navController.popBackStack() },
-                        onPublished = { navController.popBackStack() },
-                    )
-                }
-                composable(Routes.CHAT) {
-                    ChatScreen(onBack = { navController.popBackStack() })
-                }
-                composable(Routes.PROFILE) {
-                    ProfileScreen(
-                        onBack = { navController.popBackStack() },
-                        onLoggedOut = {
-                            navController.navigate(Routes.LOGIN) {
-                                popUpTo(navController.graph.id) { inclusive = true }
-                            }
-                        },
-                    )
-                }
-                composable(Routes.POI_LIST) {
-                    PoiListScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenDetail = { poiId ->
-                            navController.navigate(Routes.poiDetail(poiId))
-                        },
-                    )
-                }
-                composable(
-                    route = Routes.POI_DETAIL,
-                    arguments = listOf(navArgument("poiId") { type = NavType.IntType }),
-                ) { entry ->
-                    val poiId = entry.arguments?.getInt("poiId") ?: 0
-                    PoiDetailScreen(
-                        poiId = poiId,
-                        onBack = { navController.popBackStack() },
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GuideBottomBar(
+    currentRoute: String?,
+    onNavigate: (String) -> Unit,
+    onRoutesUnavailable: () -> Unit,
+) {
+    val tabs = listOf(
+        GuideTab(Routes.HOME, "首页", Icons.Outlined.Home),
+        GuideTab(Routes.CHAT, "AI 导览", Icons.Outlined.Send),
+        GuideTab(null, "游玩攻略", Icons.Outlined.List),
+        GuideTab(Routes.POI_LIST, "景点", Icons.Outlined.Place),
+        GuideTab(Routes.PROFILE, "我的", Icons.Outlined.Person),
+    )
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+        tabs.forEach { tab ->
+            val route = tab.route
+            NavigationBarItem(
+                selected = route != null && currentRoute == route,
+                onClick = {
+                    if (route == null) onRoutesUnavailable() else onNavigate(route)
+                },
+                icon = { Icon(tab.icon, contentDescription = tab.label) },
+                label = { Text(tab.label) },
+            )
         }
     }
 }

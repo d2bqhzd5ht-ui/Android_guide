@@ -1,5 +1,6 @@
 package com.example.scenicguide.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,34 +8,37 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Send
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,46 +48,28 @@ import com.example.scenicguide.data.model.PoiBrief
 import com.example.scenicguide.data.model.QuickEntry
 import com.example.scenicguide.data.model.RouteBrief
 import com.example.scenicguide.ui.components.ErrorView
+import com.example.scenicguide.ui.components.GuideCard
+import com.example.scenicguide.ui.components.GuideTopBar
 import com.example.scenicguide.ui.components.LoadingView
+import com.example.scenicguide.ui.components.PoiImage
+import com.example.scenicguide.ui.components.SectionTitle
 import com.example.scenicguide.ui.rememberAppContainer
-
-private val bannerBrushes = listOf(
-    listOf(Color(0xFF0E7C66), Color(0xFF4BB39A)),
-    listOf(Color(0xFF1F5F8B), Color(0xFF5AA9D6)),
-    listOf(Color(0xFF8B5E1F), Color(0xFFD6A85A)),
-)
-
-private val hexPattern = Regex("#[0-9a-fA-F]{6}")
 
 /** 后端 quickEntries[].path 的目标路由（与后台配置保持一致） */
 private const val LOST_FOUND_PATH = "/lost-found"
 private const val CHAT_PATH = "/interaction"
 private const val POI_PATH = "/poi"
 private const val POI_LIST_PATH = "/poi_list"
+private const val POIS_PATH = "/pois"
+private const val ROUTES_PATH = "/routes"
 
-/** 后端 banners.color 是 CSS 串（如 linear-gradient(135deg, #1989fa, #4db8ff)），取其中的色值来画渐变 */
-private fun bannerBrush(css: String, fallback: List<Color>): Brush {
-    val colors = hexPattern.findAll(css)
-        .map { Color(("FF" + it.value.drop(1)).toLong(16)) }
-        .toList()
-    return when {
-        colors.size >= 2 -> Brush.linearGradient(listOf(colors[0], colors[1]))
-        colors.size == 1 -> Brush.linearGradient(listOf(colors[0], colors[0].copy(alpha = 0.7f)))
-        else -> Brush.linearGradient(fallback)
-    }
-}
-
-/** 快捷入口的 color 是单个十六进制色值 */
-private fun hexColor(hex: String, fallback: Color): Color =
-    hexPattern.find(hex)?.let { Color(("FF" + it.value.drop(1)).toLong(16)) } ?: fallback
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onOpenChat: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenLostFound: () -> Unit,
-    onOpenPoiList: () -> Unit = {},
+    onOpenPoiList: () -> Unit,
+    onOpenPoiDetail: (Int) -> Unit,
 ) {
     val container = rememberAppContainer()
     val viewModel: HomeViewModel = viewModel(
@@ -92,9 +78,11 @@ fun HomeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("景区导览", fontWeight = FontWeight.SemiBold) },
+            GuideTopBar(
+                title = "西湖导览",
+                subtitle = "WEST LAKE",
                 actions = {
                     TextButton(onClick = onOpenProfile) {
                         Text("我的")
@@ -120,6 +108,7 @@ fun HomeScreen(
                 onOpenChat = onOpenChat,
                 onOpenLostFound = onOpenLostFound,
                 onOpenPoiList = onOpenPoiList,
+                onOpenPoiDetail = onOpenPoiDetail,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -131,55 +120,74 @@ private fun HomeContentView(
     content: HomeContent,
     onOpenChat: () -> Unit,
     onOpenLostFound: () -> Unit,
-    onOpenPoiList: () -> Unit = {},
+    onOpenPoiList: () -> Unit,
+    onOpenPoiDetail: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val onRoutesUnavailable = {
+        Toast.makeText(context, "游玩攻略暂未开放", Toast.LENGTH_SHORT).show()
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             Text(
                 text = "发现身边的风景",
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "AI 导览随时为你讲解",
+                text = "从容游览，随时了解西湖故事",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
 
         item { BannerPager(content.banners) }
 
         item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenChat),
+            GuideCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenChat,
             ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "AI 智能问答",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = "边逛边问，流式回答随问随到",
-                            color = Color(0xFFCDEFE5),
-                            style = MaterialTheme.typography.bodySmall,
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.shapes.medium,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Send,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    Text(text = "去提问 ›", color = Color.White)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp),
+                    ) {
+                        Text(text = "AI 智能导览", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = "边逛边问，了解景点与游览建议",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    Text(
+                        text = "去提问",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
         }
@@ -193,8 +201,13 @@ private fun HomeContentView(
                         when (entry.path) {
                             LOST_FOUND_PATH -> onOpenLostFound()
                             CHAT_PATH -> onOpenChat()
-                            POI_PATH, POI_LIST_PATH -> onOpenPoiList()
-                            else -> Unit
+                            POI_PATH, POI_LIST_PATH, POIS_PATH -> onOpenPoiList()
+                            ROUTES_PATH -> onRoutesUnavailable()
+                            else -> Toast.makeText(
+                                context,
+                                "该入口暂未开放",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
                     },
                 )
@@ -203,12 +216,14 @@ private fun HomeContentView(
 
         if (content.hotPois.isNotEmpty()) {
             item { SectionTitle("热门景点") }
-            item { HotPoiRow(content.hotPois) }
+            item { HotPoiRow(content.hotPois, onOpenPoiDetail) }
         }
 
         if (content.recommendedRoutes.isNotEmpty()) {
             item { SectionTitle("推荐路线") }
-            items(content.recommendedRoutes) { route -> RouteCard(route) }
+            items(content.recommendedRoutes) { route ->
+                RouteCard(route = route, onClick = onRoutesUnavailable)
+            }
         }
 
         if (content.banners.isEmpty() && content.quickEntries.isEmpty() &&
@@ -226,60 +241,52 @@ private fun HomeContentView(
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-    )
-}
-
-@Composable
 private fun BannerPager(banners: List<Banner>) {
     if (banners.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(150.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("暂无轮播内容", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        GuideCard(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "暂无轮播内容",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         return
     }
 
     val pagerState = rememberPagerState(pageCount = { banners.size })
-
     Column {
         HorizontalPager(
             state = pagerState,
             pageSpacing = 12.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp),
+                .height(196.dp),
         ) { page ->
             val banner = banners[page]
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(bannerBrush(banner.color, bannerBrushes[page % bannerBrushes.size])),
+            GuideCard(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(0.dp),
             ) {
-                Column(
+                PoiImage(
+                    imageUrl = banner.image,
+                    contentDescription = banner.title,
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(18.dp),
-                ) {
-                    Text(
-                        text = banner.title.ifBlank { "景区推荐" },
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                        .fillMaxWidth()
+                        .height(140.dp),
+                )
+                Text(
+                    text = banner.title.ifBlank { "西湖景区推荐" },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                )
             }
         }
 
@@ -299,7 +306,7 @@ private fun BannerPager(banners: List<Banner>) {
                             if (index == pagerState.currentPage) {
                                 MaterialTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.surfaceVariant
+                                MaterialTheme.colorScheme.secondaryContainer
                             },
                         ),
                 )
@@ -314,31 +321,36 @@ private fun QuickEntryRow(entries: List<QuickEntry>, onEntryClick: (QuickEntry) 
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        entries.take(4).forEachIndexed { index, entry ->
-            val tint = hexColor(entry.color, bannerBrushes[index % bannerBrushes.size].first())
+        entries.take(4).forEach { entry ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onEntryClick(entry) },
+                    .clickable { onEntryClick(entry) }
+                    .padding(vertical = 4.dp),
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(tint.copy(alpha = 0.15f)),
+                        .size(44.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.shapes.medium,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = entry.label.take(1).ifBlank { "·" },
-                        color = tint,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                    Icon(
+                        imageVector = quickEntryIcon(entry.path),
+                        contentDescription = entry.label,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
                 Text(
                     text = entry.label,
                     style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
@@ -346,77 +358,78 @@ private fun QuickEntryRow(entries: List<QuickEntry>, onEntryClick: (QuickEntry) 
     }
 }
 
+private fun quickEntryIcon(path: String): ImageVector = when (path) {
+    LOST_FOUND_PATH -> Icons.Outlined.Search
+    CHAT_PATH -> Icons.Outlined.Send
+    POI_PATH, POI_LIST_PATH, POIS_PATH -> Icons.Outlined.Place
+    ROUTES_PATH -> Icons.Outlined.List
+    else -> Icons.Outlined.Info
+}
+
 @Composable
-private fun HotPoiRow(pois: List<PoiBrief>) {
+private fun HotPoiRow(pois: List<PoiBrief>, onOpenPoiDetail: (Int) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(pois) { poi ->
-            Card(
-                shape = RoundedCornerShape(14.dp),
+            GuideCard(
                 modifier = Modifier
-                    .size(width = 170.dp, height = 110.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    .width(210.dp)
+                    .height(132.dp),
+                onClick = { onOpenPoiDetail(poi.id) },
+                contentPadding = PaddingValues(14.dp),
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = poi.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (poi.category.isNotBlank()) {
                     Text(
-                        text = poi.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (poi.category.isNotBlank()) {
-                        Text(
-                            text = poi.category,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = poi.description.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
+                        text = poi.category,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
+                Text(
+                    text = poi.description.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun RouteCard(route: RouteBrief) {
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+private fun RouteCard(route: RouteBrief, onClick: () -> Unit) {
+    GuideCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Text(text = route.name, style = MaterialTheme.typography.titleSmall)
+        route.description?.let {
             Text(
-                text = route.name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
             )
-            route.description?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-            val meta = buildList {
-                if (route.theme.isNotBlank()) add(route.theme)
-                if (route.estimatedMinutes > 0) add("约 ${route.estimatedMinutes} 分钟")
-            }.joinToString(" · ")
-            if (meta.isNotBlank()) {
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
+        }
+        val meta = buildList {
+            if (route.theme.isNotBlank()) add(route.theme)
+            if (route.estimatedMinutes > 0) add("约 ${route.estimatedMinutes} 分钟")
+        }.joinToString(" · ")
+        if (meta.isNotBlank()) {
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }
