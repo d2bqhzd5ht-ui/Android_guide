@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.scenicguide.ui.home
 
 import android.widget.Toast
