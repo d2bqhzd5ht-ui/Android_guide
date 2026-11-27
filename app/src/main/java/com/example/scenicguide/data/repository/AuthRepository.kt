@@ -7,6 +7,8 @@ import com.example.scenicguide.core.session.Session
 import com.example.scenicguide.core.session.SessionManager
 import com.example.scenicguide.core.session.SessionUser
 import com.example.scenicguide.data.model.LoginRequest
+import com.example.scenicguide.data.model.RegisterData
+import com.example.scenicguide.data.model.RegisterRequest
 import com.example.scenicguide.data.model.toSessionUser
 import com.example.scenicguide.data.remote.AuthApi
 
@@ -34,6 +36,24 @@ class AuthRepository(
                 sessionManager.save(session)
                 ApiResult.Success(session)
             }
+        }
+    }
+
+    /** 注册：后端不自动登录，返回新用户 id；成功后调用方应跳登录页 */
+    suspend fun register(
+        username: String,
+        password: String,
+        email: String? = null,
+    ): ApiResult<RegisterData> {
+        val result = apiCall {
+            api.register(RegisterRequest(username.trim(), password, email?.trim()))
+        }
+        return when (result) {
+            is ApiResult.Failure -> {
+                // 409 用户名已存在：把后端 message 透传给 UI
+                result
+            }
+            is ApiResult.Success -> result
         }
     }
 

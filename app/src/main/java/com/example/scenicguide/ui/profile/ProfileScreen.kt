@@ -13,20 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,16 +33,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.scenicguide.core.network.ApiResult
+import com.example.scenicguide.ui.components.GuideCard
+import com.example.scenicguide.ui.components.GuideTopBar
 import com.example.scenicguide.ui.rememberAppContainer
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
@@ -77,12 +72,12 @@ fun ProfileScreen(
     val displayName = user?.nickname?.takeIf { it.isNotBlank() } ?: user?.username.orEmpty()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("个人中心", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("返回") }
-                },
+            GuideTopBar(
+                title = "个人中心",
+                subtitle = "收藏湖山记忆，继续你的西湖之旅",
+                onBack = onBack,
             )
         },
     ) { padding ->
@@ -92,103 +87,134 @@ fun ProfileScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = displayName.take(1).ifBlank { "游" },
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                }
-                Column(modifier = Modifier.padding(start = 16.dp)) {
-                    Text(
-                        text = displayName.ifBlank { "未登录" },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = roleLabel(user?.role),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            GuideCard(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = displayName.take(1).ifBlank { "游" },
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Column(modifier = Modifier.padding(start = 16.dp)) {
+                        Text(
+                            text = displayName.ifBlank { "未登录" },
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = roleLabel(user?.role),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                    InfoRow(label = "用户名", value = user?.username.orEmpty().ifBlank { "-" })
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    InfoRow(label = "昵称", value = user?.nickname.orEmpty().ifBlank { "-" })
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    InfoRow(label = "用户 ID", value = user?.id.orEmpty().ifBlank { "-" })
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    InfoRow(label = "角色", value = roleLabel(user?.role))
-                }
+            GuideCard(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "账号资料",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                InfoRow(label = "用户名", value = user?.username.orEmpty().ifBlank { "-" })
+                ProfileDivider()
+                InfoRow(label = "昵称", value = user?.nickname.orEmpty().ifBlank { "-" })
+                ProfileDivider()
+                InfoRow(label = "用户 ID", value = user?.id.orEmpty().ifBlank { "-" })
+                ProfileDivider()
+                InfoRow(label = "角色", value = roleLabel(user?.role))
             }
 
             when {
-                refreshing -> Row(
-                    modifier = Modifier.padding(top = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                refreshing -> Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = MaterialTheme.shapes.small,
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
-                    )
-                    Text(
-                        text = "正在刷新资料…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text(
+                            text = "正在刷新资料…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
                 }
 
-                profileError != null -> Row(
-                    modifier = Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                profileError != null -> Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = MaterialTheme.shapes.small,
                 ) {
-                    Text(
-                        text = "刷新失败，请重试",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = { refreshProfile() }) { Text("重试") }
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "刷新失败，请重试",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(
+                            onClick = { refreshProfile() },
+                            modifier = Modifier.height(48.dp),
+                        ) {
+                            Text("重试")
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            OutlinedButton(
-                onClick = { showLogoutDialog = true },
-                enabled = !loggingOut,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (loggingOut) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(
-                        text = "退出登录",
-                        color = MaterialTheme.colorScheme.error,
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "账号安全",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                OutlinedButton(
+                    onClick = { showLogoutDialog = true },
+                    enabled = !loggingOut,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) {
+                    if (loggingOut) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(
+                            text = "退出登录",
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
 
@@ -196,10 +222,9 @@ fun ProfileScreen(
                 text = "景区 AI 导览 v1.0",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp),
+                    .padding(top = 8.dp, bottom = 8.dp),
             )
         }
     }
@@ -221,33 +246,45 @@ fun ProfileScreen(
                             onLoggedOut()
                         }
                     },
-                ) { Text("退出") }
+                    modifier = Modifier.height(48.dp),
+                ) {
+                    Text("退出", color = MaterialTheme.colorScheme.error)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) { Text("取消") }
+                TextButton(
+                    onClick = { showLogoutDialog = false },
+                    modifier = Modifier.height(48.dp),
+                ) {
+                    Text("取消")
+                }
             },
         )
     }
 }
 
 @Composable
+private fun ProfileDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 12.dp),
+        color = MaterialTheme.colorScheme.outlineVariant,
+    )
+}
+
+@Composable
 private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }

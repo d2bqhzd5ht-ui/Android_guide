@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.util.Log
 
 class LoginViewModel(private val repository: AuthRepository) : ViewModel() {
 
@@ -30,6 +31,7 @@ class LoginViewModel(private val repository: AuthRepository) : ViewModel() {
 
     fun login() {
         val current = _state.value
+        Log.d("ApiTrace", "login() called username='${current.username}' pwLen=${current.password.length} loading=${current.loading}")
         if (current.loading) return
         if (current.username.isBlank() || current.password.isBlank()) {
             _state.update { it.copy(error = "请输入账号和密码") }

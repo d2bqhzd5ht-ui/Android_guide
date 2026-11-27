@@ -10,7 +10,12 @@ import kotlinx.serialization.json.JsonObject
 data class LoginRequest(val username: String, val password: String)
 
 @Serializable
-data class RegisterRequest(val username: String, val password: String, val nickname: String? = null)
+data class RegisterRequest(
+    val username: String,
+    val password: String,
+    val email: String? = null,
+    val nickname: String? = null,
+)
 
 /** 登录返回：{ user: {...}, token } */
 @Serializable
